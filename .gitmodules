@@ -4,3 +4,6 @@
 [submodule "googletest"]
 	path = googletest
 	url = https://github.com/google/googletest
+[submodule "curl"]
+	path = curl
+	url = https://github.com/curl/curl
