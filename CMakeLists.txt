@@ -37,8 +37,8 @@ file(GLOB LOCAL_SRC
 )
 
 set(GTEST_SRC
-        ${POLESTAR_PAK_DIR}/googletest/googletest/src/gtest-all.cc
-        ${POLESTAR_PAK_DIR}/googletest/googlemock/src/gmock-all.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/googletest/googletest/src/gtest-all.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/googletest/googlemock/src/gmock-all.cc
 )
 
 
