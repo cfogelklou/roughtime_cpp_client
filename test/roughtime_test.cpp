@@ -1,15 +1,20 @@
+#define USE_CURL 0
+
+#if (USE_CURL > 0)
 #include <curl/curl.h>
 #include <curl/easy.h>
+#endif
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 using namespace testing;
 
+#if (USE_CURL > 0)
 TEST(TestCurl, curl_1) {
   CURL * curl = curl_easy_init();
   EXPECT_NE(nullptr, curl);
-  curl_easy_cleanup(curl);
-  
+  curl_easy_cleanup(curl);  
 }
+#endif
 
 int main(int argc, char** argv){
   
