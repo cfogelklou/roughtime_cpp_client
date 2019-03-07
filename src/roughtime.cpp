@@ -111,6 +111,8 @@ static const uint8_t * subarray(
   out.clear();
   const uint8_t * const b = bstr.data();
   out.assign(&b[beg], len);
+
+  LOG_ASSERT_WARN(out.length() == (toIdx - fromIdx));
   return out.data();
 }
 
@@ -444,11 +446,11 @@ int RtClient::Parse(
     }
   } // for (;;)
 
+#if 1
   {
     std::ustring sigstr;
     subarray(bstring, CERT_SIG_tagstart, CERT_SIG_tagend, sigstr);
 
-#if 1
     std::ustring pubkeystr;
     pubkeystr.assign(pubkey, 32);
     std::ustring delegate;
@@ -457,19 +459,28 @@ int RtClient::Parse(
     {
       return reject(b, "CERT.DELE does not verify");      
     }
-#endif
+
   }
+#endif
+
+#if 1
+  {
+    //const sig = b.subarray(SIG_tagstart, SIG_tagend)
+    std::ustring sigstr;
+    subarray(bstring, SIG_tagstart, SIG_tagend, sigstr);
+
+    std::ustring pubkeystr;
+      //const key = b.subarray(CERT_DELE_PUBK_tagstart, CERT_DELE_PUBK_tagend)
+    subarray(bstring, CERT_DELE_PUBK_tagstart, CERT_DELE_PUBK_tagend, pubkeystr);
+
+    std::ustring signedResponseContextStr((uint8_t *)signedResponseContext, strlen(signedResponseContext) + 1);
+    if (!verify(sigstr, signedResponseContextStr, bstring, SREP_tagstart, SREP_tagend, pubkeystr)) {
+      return reject(b, "SREP does not verify");
+    }
+  }
+#endif
 
 #if 0
-  {
-    const sig = b.subarray(SIG_tagstart, SIG_tagend)
-      const key = b.subarray(CERT_DELE_PUBK_tagstart, CERT_DELE_PUBK_tagend)
-
-      if (!verify(sig, signedResponseContext, b, SREP_tagstart, SREP_tagend, key)) {
-        return reject(b, "SREP does not verify")
-      }
-  }
-
   let h = createHash("sha512").
     update(zero).
     update(nonce).
