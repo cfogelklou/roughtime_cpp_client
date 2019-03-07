@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cs_task_locker.hpp"
+#include "queue_base.hpp"
 #include <cstdint>
 #include <queue>
 
@@ -10,14 +11,14 @@
 
 typedef std::queue<uint8_t> Queue;
 
-class ByteQ {
+class ByteQ : public QueueBase {
 public:
   ByteQ()
+  : mQueue()
   {
-    
   }
   
-  size_t Write(const uint8_t bytes[], const size_t len){
+  size_t Write(const uint8_t bytes[], const size_t len) override {
     CSTaskLocker cs;
     for (size_t i = 0; i < len; i++){
       mQueue.push(bytes[i]);
@@ -25,15 +26,15 @@ public:
     return len;
   }
   
-  size_t GetWriteReady(){
+  size_t GetWriteReady() override {
     return 4096;
   }
   
-  size_t GetReadReady(){
+  size_t GetReadReady() override {
     return mQueue.size();
   }
   
-  size_t Read(uint8_t bytes[], const size_t len){
+  size_t Read(uint8_t bytes[], const size_t len) override {
     CSTaskLocker cs;
     size_t readBytes = GetReadReady();
     readBytes = MIN(len, readBytes);

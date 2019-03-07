@@ -27,7 +27,7 @@ typedef int SOCKET;
 
 #include "cs_task_locker.hpp"
 #include "byte_q.hpp"
-
+#include "queue_base.hpp"
 
 
 #ifdef WIN32
@@ -38,11 +38,6 @@ typedef int SOCKET;
 
 static const int DEFAULT_BUFLEN = 32768;
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
-
-
-
-
-
 
 // ////////////////////////////////////////////////////////////////////////////
 class SerSocket {
@@ -95,7 +90,7 @@ public:
 do { LOG_WARNING(("Assertion Failed at %s(%d)\r\n", __FILE__, __LINE__)); } while(0)
 
 // /////////////////////////////////
-class SerSocketQueue {
+class SerSocketQueue : public QueueBase{
 private:
   SOCKET mListenSocket; ///< Wait for connections on this socket.
   SOCKET mNextCommsSocket; /// Receive data on this socket.
@@ -110,8 +105,9 @@ private:
 
 public:
   // /////////////////////////////////
-  SerSocketQueue
-  (const int port)
+  SerSocketQueue(
+    const char *szAddr,
+    const int port)
     : mListenSocket(INVALID_SOCKET)
     , mNextCommsSocket(INVALID_SOCKET)
     , mRxByteQ()
@@ -123,11 +119,11 @@ public:
     , recvbuf{ 0 }
   {
     SerSocket::inst().Init();
-    setupPort(true, mPort);
+    setupPort(szAddr, true, mPort);
 
     // Create a thread for listening for incoming connections.
-    mpAcceptThread = new std::thread(nextRxConnectionC, this);
-    mpAcceptThread->detach();
+    //mpAcceptThread = new std::thread(nextRxConnectionC, this);
+    //mpAcceptThread->detach();
 
   }
 
@@ -143,21 +139,22 @@ public:
 
 private:
 
-  void setupPort(const bool isRxPort, const int port) {
+  void setupPort(const char *szAddr, const bool isRxPort, const int port) {
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = IPPROTO_UDP;
     hints.ai_flags = AI_PASSIVE;
 
     // Resolve the server address and port
     struct addrinfo *rxResult = NULL;
     char szPort[100];
     snprintf(szPort, sizeof(szPort), "%d", port);
-    int result = getaddrinfo(NULL, szPort, &hints, &rxResult);
+    int result = getaddrinfo(szAddr, szPort, &hints, &rxResult);
     if (result != 0) {
       LOG_TRACE(("getaddrinfo failed with error: %d \r\n", result));
+      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(result));
       return;
     }
 
@@ -170,13 +167,17 @@ private:
         return;
       }
 
-      // Setup the TCP listening socket
-      result = bind(mListenSocket, rxResult->ai_addr, (int)rxResult->ai_addrlen);
-      if (result == SOCKET_ERROR) {
-        LOG_TRACE(("listen failed with error \r\n"));
-        freeaddrinfo(rxResult);
-        SerSocket::inst().sockClose(mListenSocket);
-        return;
+      // Setup the UDP listening socket
+      if (hints.ai_protocol != IPPROTO_UDP){
+        // TCP Only
+        result = bind(mListenSocket, rxResult->ai_addr, (int)rxResult->ai_addrlen);
+        if (result == SOCKET_ERROR) {
+          LOG_TRACE(("listen failed with error \r\n"));
+          fprintf(stderr, "bind: %s\n", gai_strerror(result));
+          freeaddrinfo(rxResult);
+          SerSocket::inst().sockClose(mListenSocket);
+          return;
+        }
       }
 
       freeaddrinfo(rxResult);
@@ -184,6 +185,7 @@ private:
       result = listen(mListenSocket, SOMAXCONN);
       if (result == SOCKET_ERROR) {
         LOG_TRACE(("listen failed with error \r\n"));
+        fprintf(stderr, "listen: %s\n", gai_strerror(result));
         SerSocket::inst().sockClose(mListenSocket);
         return;
       }
@@ -227,10 +229,12 @@ private:
     }
   }
 
+#if 0
   // /////////////////////////////////
   static void nextRxConnectionC(void *pThis) {
     ((SerSocketQueue *)pThis)->nextRxConnection();
   }
+
 
   // /////////////////////////////////
   // This thread constantly accepts new connections
@@ -253,6 +257,7 @@ private:
       OSALSleep(1000);
     }
   }
+#endif
 
   typedef struct SendBufTag {
     struct {
@@ -264,7 +269,7 @@ private:
 
   // /////////////////////////////////
   void sendThread(SendBufT *p) {
-
+#if 0
     // Handle transmission on the send socket.
     if (mNextCommsSocket != INVALID_SOCKET) {
       SOCKET clientSocket = mNextCommsSocket;
@@ -276,6 +281,17 @@ private:
       }
     }
     free(p);
+#else
+    // Handle transmission on the send socket.
+    SOCKET clientSocket = mListenSocket;
+    int result = send(clientSocket, (char *)p->payload, p->hdr.numBytes, 0);
+    if (result == SOCKET_ERROR) {
+      mNextCommsSocket = INVALID_SOCKET;
+      LOG_WARNING(("Could not send to socket.\r\n"));
+      //SerSocket::inst().sockClose(clientSocket);
+    }
+    free(p);
+#endif
   }
 
   static void sendThreadC(void *p) {
@@ -285,7 +301,7 @@ private:
   // //////////////////////////////////////////////////////////////////////////
   // Write function, returns amount written.  Does not trigger a callback as
   // it is typically implemented using a FIFO.
-  int Write(const uint8_t *const pBytes, const int numBytes) {
+  size_t Write(const uint8_t *const pBytes, const size_t numBytes) override {
     if (mNextCommsSocket != INVALID_SOCKET) {
       SendBufT *pThreadData = (SendBufT *)malloc(sizeof(SendBufT::hdr) + numBytes);
       pThreadData->hdr.pThis = this;
@@ -299,22 +315,31 @@ private:
 
   // //////////////////////////////////////////////////////////////////////////
   // Get Write Ready.  Returns amount that can be written.
-  int GetWriteReady() {
+  size_t GetWriteReady() override{
     return DEFAULT_BUFLEN;
   }
 
   // //////////////////////////////////////////////////////////////////////////
   // Read function - returns amount available.  Typically uses an internal FIFO.
-  int Read(uint8_t *const pBytes, const int numBytes) {
+  size_t Read(uint8_t *const pBytes, const size_t numBytes) override {
     CSTaskLocker cs;
     return mRxByteQ.Read(pBytes, numBytes);
   }
 
   // Get the number of bytes that can be read.
-  int GetReadReady() {
+  size_t  GetReadReady() override{
     CSTaskLocker cs;
     return mRxByteQ.GetReadReady();
   }
 
 };
 
+QueueBase &GetQueueToIp(const char *szAddr, const int port){
+  auto p = new SerSocketQueue(szAddr, port);
+  return *p;
+}
+
+void ReleaseQueueToIp(QueueBase *p){
+  SerSocketQueue *ps = (SerSocketQueue *)p;
+  delete ps;
+}

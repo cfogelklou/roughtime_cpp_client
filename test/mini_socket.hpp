@@ -1,10 +1,8 @@
-#ifndef MINI_SOCKET_HPP
-#define MINI_SOCKET_HPP
+#pragma once
 
-class MiniSocket {
-public:
+#include "queue_base.hpp"
 
+QueueBase &GetQueueToIp(const char *szAddr, const int port);
 
-};
+void ReleaseQueueToIp(QueueBase *p);
 
-#endif
