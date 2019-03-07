@@ -85,11 +85,11 @@ public:
 };
 
 #define BUFLEN 2048
-class SerSocketQueue: public QueueBase {
+class UdpClient: public QueueBase {
 public:
 
 public:
-  SerSocketQueue(const char *szAddr, const int port)
+  UdpClient(const char *szAddr, const int port)
   : QueueBase()
   , mSocket(INVALID_SOCKET)
   , mRxQ()
@@ -104,7 +104,7 @@ public:
     hints.ai_flags |= AI_ALL; // Query both IP6 and IP4 with AI_V4MAPPED
 
     // Resolve the server address and port
-    char szPort[100];
+    char szPort[10];
     snprintf(szPort, sizeof(szPort), "%d", port);
     int result = getaddrinfo(szAddr, szPort, &hints, &mpAddrInfo);
     if (result != 0) {
@@ -121,7 +121,7 @@ public:
   }
 
   // //////////////////////////////////////////////////////////////////////////
-  ~SerSocketQueue(){
+  ~UdpClient(){
     freeaddrinfo(mpAddrInfo);    
     SerSocket::inst().sockClose(mSocket);
   }
@@ -134,7 +134,6 @@ public:
     if (!ok) {
       auto err = WSAGetLastError();
       LOG_TRACE(("send: %s\n", gai_strerror(err)));
-      //printf("sendto() failed with error code : %d" , WSAGetLastError());
       exit(EXIT_FAILURE);
     }
 
@@ -149,7 +148,7 @@ public:
     if (ok){
       // Use thread to read from socket to prevent blocking.
       auto ReadFromSocketThread = [](void *pThis) {
-        SerSocketQueue &th = *(SerSocketQueue *)pThis;
+        UdpClient &th = *(UdpClient *)pThis;
 
         char  rxBuf[BUFLEN] = {0};
         socklen_t alen = th.mpAddrInfo->ai_addrlen;
@@ -193,12 +192,12 @@ private:
 
 // ////////////////////////////////////////////////////////////////////////////
 QueueBase &CreateUdpClient(const char *szAddr, const int port){
-  auto p = new SerSocketQueue(szAddr, port);
+  auto p = new UdpClient(szAddr, port);
   return *p;
 }
 
 // ////////////////////////////////////////////////////////////////////////////
 void DeleteUdpClient(QueueBase *p){
-  SerSocketQueue *ps = (SerSocketQueue *)p;
+  UdpClient *ps = (UdpClient *)p;
   delete ps;
 }
