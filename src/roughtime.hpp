@@ -45,7 +45,7 @@ public:
   
   static void PadRequest(const std::ustring &unpadded, std::ustring &padded);
 
-  static int RtClient::Parse(
+  static int Parse(
     const uint8_t pubkey[32],
     const uint8_t nonce[64],
     const uint8_t b[],

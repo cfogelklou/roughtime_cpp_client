@@ -4,7 +4,9 @@
 #include <chrono>
 #include <assert.h>
 
-
+#ifndef MIN
+#define MIN(x,y) (((x) < (y)) ? (x) : (y))
+#endif
 
 // ////////////////////////////////////////////////////////////////////////////
 static uint64_t rt_seconds_since_epoch() {
@@ -90,6 +92,32 @@ static uint64_t uint64(const uint8_t b[], const int i) {
   return LE64TOHOST(tmp);
 }
 
+static bool verify
+ (
+  const std::ustring &sigstr,
+  void *certificateContext,
+  const std::ustring &bstring,
+  const int CERT_DELE_tagstart,
+  const int CERT_DELE_tagend,
+  const std::ustring &pubkey){
+   return true;
+}
+
+static const uint8_t * subarray(
+  const std::ustring &bstr,
+  const size_t fromIdx,
+  const size_t toIdx, // up to AND INCLUDING
+  std::ustring &out ){
+  const size_t end = MIN(toIdx, (bstr.size()-1));
+  const size_t beg = MIN(end, fromIdx);
+  const int len = end - beg;
+  assert(len >= 0);
+  out.clear();
+  const uint8_t * const b = bstr.data();
+  out.assign(&b[beg], len);
+  return out.data();
+}
+
 // /////////////////////////////////////////////////////////////////////////////
 int RtClient::Parse(
   const uint8_t pubkey[32],
@@ -97,6 +125,9 @@ int RtClient::Parse(
   const uint8_t b[],
   const size_t b_length
   ) {
+  std::ustring bstring;
+  bstring.assign(b, b_length);
+  
   int CERT_tagstart = -1;
   int CERT_tagend = -1;
   int INDX_tagstart = -1;
@@ -380,15 +411,22 @@ int RtClient::Parse(
     }
   } // for (;;)
 
-#if 0
   {
-    const sig = b.subarray(CERT_SIG_tagstart, CERT_SIG_tagend)
+    std::ustring sigstr;
+    const uint8_t *sig = subarray(bstring, CERT_SIG_tagstart, CERT_SIG_tagend, sigstr);
 
-      if (!verify(sig, certificateContext, b, CERT_DELE_tagstart, CERT_DELE_tagend, pubkey)) {
-        return reject(b, "CERT.DELE does not verify")
-      }
+#if 1
+    void *certificateContext = nullptr;
+    std::ustring pubkeystr;
+    pubkeystr.assign(pubkey, 32);
+    if (!verify(sig, certificateContext, bstring, CERT_DELE_tagstart, CERT_DELE_tagend, pubkeystr))
+    {
+      return reject(b, "CERT.DELE does not verify");      
+    }
+#endif
   }
 
+#if 0
   {
     const sig = b.subarray(SIG_tagstart, SIG_tagend)
       const key = b.subarray(CERT_DELE_PUBK_tagstart, CERT_DELE_PUBK_tagend)
