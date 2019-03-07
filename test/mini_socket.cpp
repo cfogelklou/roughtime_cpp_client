@@ -107,12 +107,25 @@ public:
   , recvbuf{ 0 }
   {
     
-    struct sockaddr_in server, si_other;
-    int slen , recv_len;
-    char buf[BUFLEN];
-    //WSADATA wsa;
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = IPPROTO_UDP;
+    hints.ai_flags = AI_PASSIVE;
     
-    slen = sizeof(si_other) ;
+    // Resolve the server address and port
+    struct addrinfo *rxResult = NULL;
+    char szPort[100];
+    snprintf(szPort, sizeof(szPort), "%d", port);
+    int result = getaddrinfo(szAddr, szPort, &hints, &rxResult);
+    if (result != 0) {
+      LOG_TRACE(("getaddrinfo failed with error: %d \r\n", result));
+      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(result));
+      return;
+    }
+    
+    static struct sockaddr_in server;
     
     //Initialise winsock
     printf("\nInitialising Winsock...");
@@ -120,7 +133,7 @@ public:
     printf("Initialised.\n");
     
     //Create a socket
-    if((mSocket = socket(AF_INET , SOCK_DGRAM , 0 )) == INVALID_SOCKET){
+    if((mSocket = socket(rxResult->ai_family, rxResult->ai_socktype, rxResult->ai_protocol )) == INVALID_SOCKET){
       fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(mSocket));
       exit(-1);
     }
@@ -139,50 +152,15 @@ public:
       exit(EXIT_FAILURE);
     }
     puts("Bind done");
+
+    std::thread t(readFromSocketThreadC, this); // pass by reference
+    t.detach();
     
-    //keep listening for data
-    while(1)
-    {
-      printf("Waiting for data...");
-      fflush(stdout);
-      
-      //clear the buffer by filling null, it might have previously received data
-      memset(buf,'\0', BUFLEN);
-      
-      //try to receive some data, this is a blocking call
-#if 0
-      if ((recv_len = recvfrom(s, buf, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
-      {
-        printf("recvfrom() failed with error code : %d" , WSAGetLastError());
-        exit(EXIT_FAILURE);
-      }
-#else
-      if ((recv_len = recv(mSocket, buf, BUFLEN, 0)) == SOCKET_ERROR)
-      {
-        //printf("recvfrom() failed with error code : %d" , WSAGetLastError());
-        exit(EXIT_FAILURE);
-      }
-#endif
-      
-      //print details of the client/peer and the data received
-      printf("Received packet from %s:%d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
-      printf("Data: %s\n" , buf);
-      
-#if 0
-      //now reply the client with the same data
-      if (sendto(s, buf, recv_len, 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
-      {
-        //printf("sendto() failed with error code : %d" , WSAGetLastError());
-        exit(EXIT_FAILURE);
-      }
+    if( connect(mSocket, rxResult->ai_addr, rxResult->ai_addrlen) == SOCKET_ERROR){
+      fprintf(stderr, "connect: %s\n", gai_strerror(mSocket));
+      exit(EXIT_FAILURE);
     }
-#endif
     
-   // closesocket(s);
-    //WSACleanup();
-    
-    //return 0;
-    }
   }
 
   ~SerSocketQueue(){
@@ -193,6 +171,7 @@ public:
     CSTaskLocker cs;
     if (send(mSocket, arr, len, 0) == SOCKET_ERROR)
     {
+      fprintf(stderr, "send: %s\n", gai_strerror(mSocket));
       //printf("sendto() failed with error code : %d" , WSAGetLastError());
       exit(EXIT_FAILURE);
     }
