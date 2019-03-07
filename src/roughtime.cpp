@@ -446,7 +446,6 @@ int RtClient::Parse(
     }
   } // for (;;)
 
-#if 1
   {
     std::ustring sigstr;
     subarray(bstring, CERT_SIG_tagstart, CERT_SIG_tagend, sigstr);
@@ -461,16 +460,12 @@ int RtClient::Parse(
     }
 
   }
-#endif
 
-#if 1
   {
-    //const sig = b.subarray(SIG_tagstart, SIG_tagend)
     std::ustring sigstr;
     subarray(bstring, SIG_tagstart, SIG_tagend, sigstr);
 
     std::ustring pubkeystr;
-      //const key = b.subarray(CERT_DELE_PUBK_tagstart, CERT_DELE_PUBK_tagend)
     subarray(bstring, CERT_DELE_PUBK_tagstart, CERT_DELE_PUBK_tagend, pubkeystr);
 
     std::ustring signedResponseContextStr((uint8_t *)signedResponseContext, strlen(signedResponseContext) + 1);
@@ -478,13 +473,27 @@ int RtClient::Parse(
       return reject(b, "SREP does not verify");
     }
   }
-#endif
 
+  //let h = createHash("sha512").update(zero).update(nonce).digest()
+  uint8_t h[512 / 8] = { 0 };
+  {
+    crypto_hash_sha512_state sha;
+    crypto_hash_sha512_init(&sha);
+    const uint8_t zero[1] = { 0 };
+    crypto_hash_sha512_update(&sha, zero, sizeof(zero));
+    crypto_hash_sha512_update(&sha, nonce, 64);
+    crypto_hash_sha512_final(&sha, h);
+  }
 #if 0
-  let h = createHash("sha512").
-    update(zero).
-    update(nonce).
-    digest()
+  for (int i = 0; i < sizeof(h); i += 8) {
+    printf("%d, %d, %d, %d, %d, %d, %d, %d, \r\n"
+      , h[i + 0], h[i + 1], h[i + 2], h[i + 3]
+      , h[i + 4], h[i + 5], h[i + 6], h[i + 7]
+    );
+  }
+  printf("\r\nhi\r\n");
+#endif 
+#if 0
 
     const pathlen = PATH_tagend - PATH_tagstart
     if (pathlen > 0) {
