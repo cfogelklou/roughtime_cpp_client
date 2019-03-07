@@ -121,7 +121,8 @@ public:
         
     //Create a socket
     if((mSocket = socket(mpAddrInfo->ai_family, mpAddrInfo->ai_socktype, mpAddrInfo->ai_protocol )) == INVALID_SOCKET){
-      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(mSocket));
+      auto err = WSAGetLastError();
+      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
       exit(-1);
     }
     printf("Socket created.\n");
@@ -146,24 +147,29 @@ public:
     }
 
     if (ok) {
-      static int timeout = 100;
+      static int timeout = 1000;
       stat = setsockopt(mSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
       ok = (stat != SOCKET_ERROR);
     }
 
     if (ok){
-      ok = false;
-      int server_length = mpAddrInfo->ai_addrlen;
-      int rx = recvfrom(mSocket, (char *)mRxBuf, sizeof(mRxBuf), 0, mpAddrInfo->ai_addr, &server_length);
-      if (SOCKET_ERROR != rx) {
-        ok = (rx == mRxByteQ.Write(mRxBuf, rx));
-      }
-      else {
-        stat = -1;
-        auto err = WSAGetLastError();
-        fprintf(stderr, "recv: %s\n", gai_strerror(err));
-        exit(EXIT_FAILURE);
-      }
+
+      // Use thread to read from socket to prevent blocking.
+      auto readFromSocketThreadC = [](void *pThis) {
+        SerSocketQueue &ssq = *(SerSocketQueue *)pThis;
+        int server_length = ssq.mpAddrInfo->ai_addrlen;
+        int rx = recvfrom(ssq.mSocket, (char *)ssq.mRxBuf, sizeof(ssq.mRxBuf), 0, ssq.mpAddrInfo->ai_addr, &server_length);
+        if (SOCKET_ERROR != rx) {
+          ssq.mRxByteQ.Write(ssq.mRxBuf, rx);
+        }
+        else {
+          const int err = WSAGetLastError();
+          fprintf(stderr, "recv: %s\n", gai_strerror(err));
+        }
+      };
+
+      std::thread t(readFromSocketThreadC, this);
+      t.detach();
     }
     return (ok) ? len : 0;
   }
@@ -183,6 +189,11 @@ public:
     return mRxByteQ.GetReadReady();
   }
 
+private:
+  // /////////////////////////////////
+  void readFromSocketThread()
+  {
+  }
 
 private:
   struct addrinfo  *mpAddrInfo;

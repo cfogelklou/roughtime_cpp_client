@@ -138,6 +138,7 @@ TEST(TestRt, SendRequest){
 
   QueueBase &p = CreateUdpClient("roughtime.cloudflare.com", 2002);
   p.Write(req.data(), req.length());
+  usleep(100000);
   const size_t bytes = p.GetReadReady();
   EXPECT_GT(bytes, 0u);
   if (bytes) {
@@ -147,7 +148,7 @@ TEST(TestRt, SendRequest){
   }
   
   DeleteUdpClient(&p);
-  
+    
   
 }
 #endif
