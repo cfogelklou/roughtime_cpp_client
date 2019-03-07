@@ -89,6 +89,164 @@ public:
 #define LOG_ASSERT_WARN(state) if (!(state)) \
 do { LOG_WARNING(("Assertion Failed at %s(%d)\r\n", __FILE__, __LINE__)); } while(0)
 
+#if 1
+class SerSocketQueue: public QueueBase {
+public:
+  
+  
+  const size_t BUFLEN = 2048;//  //Max length of buffer
+  //const int PORT = 2002;//8888  //The port on which to listen for incoming data
+  
+  SerSocketQueue(const char *szAddr, const int port)
+  : QueueBase()
+  , mSocket(INVALID_SOCKET)
+  , mRxByteQ()
+  , mRunning(true)
+  , mPort(port)
+  , recvbuflen(sizeof(recvbuf))
+  , recvbuf{ 0 }
+  {
+    
+    struct sockaddr_in server, si_other;
+    int slen , recv_len;
+    char buf[BUFLEN];
+    //WSADATA wsa;
+    
+    slen = sizeof(si_other) ;
+    
+    //Initialise winsock
+    printf("\nInitialising Winsock...");
+    SerSocket::inst().Init();
+    printf("Initialised.\n");
+    
+    //Create a socket
+    if((mSocket = socket(AF_INET , SOCK_DGRAM , 0 )) == INVALID_SOCKET){
+      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(mSocket));
+      exit(-1);
+    }
+    printf("Socket created.\n");
+    
+    //Prepare the sockaddr_in structure
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = INADDR_ANY;
+    server.sin_port = htons( mPort );
+    
+    //Bind
+    if( bind(mSocket ,(struct sockaddr *)&server , sizeof(server)) == SOCKET_ERROR)
+    {
+      //printf("Bind failed with error code : %d" , WSAGetLastError());
+      fprintf(stderr, "bind: %s\n", gai_strerror(mSocket));
+      exit(EXIT_FAILURE);
+    }
+    puts("Bind done");
+    
+    //keep listening for data
+    while(1)
+    {
+      printf("Waiting for data...");
+      fflush(stdout);
+      
+      //clear the buffer by filling null, it might have previously received data
+      memset(buf,'\0', BUFLEN);
+      
+      //try to receive some data, this is a blocking call
+#if 0
+      if ((recv_len = recvfrom(s, buf, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) == SOCKET_ERROR)
+      {
+        printf("recvfrom() failed with error code : %d" , WSAGetLastError());
+        exit(EXIT_FAILURE);
+      }
+#else
+      if ((recv_len = recv(mSocket, buf, BUFLEN, 0)) == SOCKET_ERROR)
+      {
+        //printf("recvfrom() failed with error code : %d" , WSAGetLastError());
+        exit(EXIT_FAILURE);
+      }
+#endif
+      
+      //print details of the client/peer and the data received
+      printf("Received packet from %s:%d\n", inet_ntoa(si_other.sin_addr), ntohs(si_other.sin_port));
+      printf("Data: %s\n" , buf);
+      
+#if 0
+      //now reply the client with the same data
+      if (sendto(s, buf, recv_len, 0, (struct sockaddr*) &si_other, slen) == SOCKET_ERROR)
+      {
+        //printf("sendto() failed with error code : %d" , WSAGetLastError());
+        exit(EXIT_FAILURE);
+      }
+    }
+#endif
+    
+   // closesocket(s);
+    //WSACleanup();
+    
+    //return 0;
+    }
+  }
+
+  ~SerSocketQueue(){
+    mRunning = false;
+  }
+
+  size_t Write(const uint8_t arr[], const size_t len) override {
+    CSTaskLocker cs;
+    if (send(mSocket, arr, len, 0) == SOCKET_ERROR)
+    {
+      //printf("sendto() failed with error code : %d" , WSAGetLastError());
+      exit(EXIT_FAILURE);
+    }
+    return 0;
+  }
+  size_t Read(uint8_t arr[], const size_t len) override {
+    return mRxByteQ.Read(arr, len);
+  }
+  size_t GetWriteReady() override {
+    return 2048;
+  }
+  size_t GetReadReady() override {
+    return mRxByteQ.GetReadReady();
+  }
+
+private:
+  // /////////////////////////////////
+  static void readFromSocketThreadC(void *pThis) {
+    ((SerSocketQueue *)pThis)->readFromSocketThread();
+  }
+
+  // /////////////////////////////////
+  void readFromSocketThread()
+  {
+    SOCKET clientSocket = mSocket;
+    // Receive until the peer shuts down the connection
+    int bytesReceived = 1;
+    while ((mRunning) && (clientSocket != INVALID_SOCKET) && (bytesReceived > 0)) {
+      bytesReceived = recv(clientSocket, (char *)recvbuf, recvbuflen - 1, 0);
+      if (bytesReceived > 0) {
+        CSTaskLocker cs;
+        auto amtWritten = mRxByteQ.Write(recvbuf, bytesReceived);
+        LOG_ASSERT_WARN(amtWritten == bytesReceived);
+      }
+      else if (bytesReceived == 0) {
+        // Do nothing
+      }
+      else {
+        LOG_TRACE(("recv failed with error\r\n"));
+      }
+    }
+    
+  }
+
+private:
+  SOCKET mSocket; ///< Wait for connections on this socket.
+  ByteQ   mRxByteQ;
+  volatile bool mRunning;
+  int mPort;
+  const size_t recvbuflen;
+  uint8_t recvbuf[DEFAULT_BUFLEN];
+};
+
+#else
 // /////////////////////////////////
 class SerSocketQueue : public QueueBase{
 private:
@@ -333,6 +491,7 @@ private:
   }
 
 };
+#endif
 
 QueueBase &GetQueueToIp(const char *szAddr, const int port){
   auto p = new SerSocketQueue(szAddr, port);
