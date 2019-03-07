@@ -37,10 +37,12 @@ typedef int SOCKET;
 #define WSAGetLastError() errno
 #endif
 
-static const int DEFAULT_BUFLEN = 2048;
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
 
-
+#define LOG_TRACE(x) std::printf x
+#define LOG_WARNING(x) std::printf x
+#define LOG_ASSERT_WARN(state) if (!(state)) \
+do { LOG_WARNING(("Assertion Failed at %s(%d)\r\n", __FILE__, __LINE__)); } while(0)
 
 // ////////////////////////////////////////////////////////////////////////////
 class SerSocket {
@@ -50,9 +52,7 @@ public:
     return local;
   }
 
-  void Init() {
-    //Nothing to do here...
-  }
+  void Init() {}
 
   // Constructor.  Init sockets.
   SerSocket() {
@@ -82,26 +82,17 @@ public:
 #endif
     return status;
   }
-
 };
 
-#define LOG_TRACE(x) std::printf x
-#define LOG_WARNING(x) std::printf x
-#define LOG_ASSERT_WARN(state) if (!(state)) \
-do { LOG_WARNING(("Assertion Failed at %s(%d)\r\n", __FILE__, __LINE__)); } while(0)
-
-
+#define BUFLEN 2048
 class SerSocketQueue: public QueueBase {
 public:
-  
-  
-  const size_t BUFLEN = 2048;//  //Max length of buffer
-  
+
+public:
   SerSocketQueue(const char *szAddr, const int port)
   : QueueBase()
   , mSocket(INVALID_SOCKET)
-  , mRxByteQ()
-  , mRxBuf{ 0 }
+  , mRxQ()
   {
     SerSocket::inst().Init();
     struct addrinfo hints;
@@ -156,14 +147,15 @@ public:
 #endif
 
     if (ok){
-
       // Use thread to read from socket to prevent blocking.
-      auto readFromSocketThreadC = [](void *pThis) {
-        SerSocketQueue &ssq = *(SerSocketQueue *)pThis;
-        socklen_t server_length = ssq.mpAddrInfo->ai_addrlen;
-        int rx = recvfrom(ssq.mSocket, (char *)ssq.mRxBuf, sizeof(ssq.mRxBuf), 0, ssq.mpAddrInfo->ai_addr, &server_length);
+      auto ReadFromSocketThread = [](void *pThis) {
+        SerSocketQueue &th = *(SerSocketQueue *)pThis;
+
+        char  rxBuf[BUFLEN] = {0};
+        socklen_t alen = th.mpAddrInfo->ai_addrlen;
+        const int rx = recvfrom(th.mSocket, rxBuf, sizeof(rxBuf), 0, th.mpAddrInfo->ai_addr, &alen);
         if (SOCKET_ERROR != rx) {
-          ssq.mRxByteQ.Write(ssq.mRxBuf, rx);
+          th.mRxQ.Write((uint8_t *)rxBuf, rx);
         }
         else {
           const int err = WSAGetLastError();
@@ -171,7 +163,7 @@ public:
         }
       };
 
-      std::thread t(readFromSocketThreadC, this);
+      std::thread t(ReadFromSocketThread, this);
       t.detach();
     }
     return (ok) ? len : 0;
@@ -179,30 +171,24 @@ public:
 
   // //////////////////////////////////////////////////////////////////////////
   size_t Read(uint8_t arr[], const size_t len) override {
-    return mRxByteQ.Read(arr, len);
+    return mRxQ.Read(arr, len);
   }
 
   // //////////////////////////////////////////////////////////////////////////
   size_t GetWriteReady() override {
-    return 2048;
+    return BUFLEN;
   }
   
   // //////////////////////////////////////////////////////////////////////////
   size_t GetReadReady() override {
-    return mRxByteQ.GetReadReady();
-  }
-
-private:
-  // /////////////////////////////////
-  void readFromSocketThread()
-  {
+    return mRxQ.GetReadReady();
   }
 
 private:
   struct addrinfo  *mpAddrInfo;
   SOCKET            mSocket;
-  ByteQ             mRxByteQ;
-  uint8_t           mRxBuf[DEFAULT_BUFLEN];
+  ByteQ             mRxQ;
+
 };
 
 // ////////////////////////////////////////////////////////////////////////////
