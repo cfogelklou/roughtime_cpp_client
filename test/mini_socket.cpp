@@ -120,8 +120,6 @@ public:
     char szPort[100];
     snprintf(szPort, sizeof(szPort), "%d", port);
     int result = getaddrinfo(szAddr, szPort, &hints, &rxResult);
-    uint8_t tmp[16];
-    memcpy(tmp, rxResult->ai_addr->sa_data, 16);
     if (result != 0) {
       LOG_TRACE(("getaddrinfo failed with error: %d \r\n", result));
       fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(result));

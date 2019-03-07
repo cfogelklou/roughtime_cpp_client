@@ -31,16 +31,24 @@ TEST(TestRt, UnpaddedRequest){
   RtClient rt;
   std::ustring req;
   rt.GenerateRequest(req);
-  ASSERT_EQ(req.length(), 64 + 8);
+  ASSERT_EQ(req.length(), 80);
   const uint8_t *pr = req.data();
-  EXPECT_EQ(pr[0], 1);
+  EXPECT_EQ(pr[0], 2); // 2 tags
   EXPECT_EQ(pr[1], 0);
   EXPECT_EQ(pr[2], 0);
   EXPECT_EQ(pr[3], 0);
-  EXPECT_EQ(pr[4], 'N');
-  EXPECT_EQ(pr[5], 'O');
-  EXPECT_EQ(pr[6], 'N');
-  EXPECT_EQ(pr[7], 'C');
+  EXPECT_EQ(pr[4], 64); // Second tag has offset 64
+  EXPECT_EQ(pr[5], 0);
+  EXPECT_EQ(pr[6], 0);
+  EXPECT_EQ(pr[7], 0);
+  EXPECT_EQ(pr[8], 'N'); // First data (at offset zero) has tag nonc
+  EXPECT_EQ(pr[9], 'O');
+  EXPECT_EQ(pr[10], 'N');
+  EXPECT_EQ(pr[11], 'C');
+  EXPECT_EQ(pr[12], 'P'); // Second data (at offset 64) has tag PAD
+  EXPECT_EQ(pr[13], 'A');
+  EXPECT_EQ(pr[14], 'D');
+  EXPECT_EQ(pr[15], 0xff);
 
 }
 
@@ -48,18 +56,26 @@ TEST(TestRt, PaddedRequest){
   RtClient rt;
   std::ustring req;
   rt.GenerateRequest(req);
-  ASSERT_EQ(req.length(), 64 + 8);
+  ASSERT_EQ(req.length(), 80);
   rt.PadRequest(req, req);
   ASSERT_EQ(req.length(), 1024);
   const uint8_t *pr = req.data();
-  EXPECT_EQ(pr[0], 1);
+  EXPECT_EQ(pr[0], 2); // 2 tags
   EXPECT_EQ(pr[1], 0);
   EXPECT_EQ(pr[2], 0);
   EXPECT_EQ(pr[3], 0);
-  EXPECT_EQ(pr[4], 'N');
-  EXPECT_EQ(pr[5], 'O');
-  EXPECT_EQ(pr[6], 'N');
-  EXPECT_EQ(pr[7], 'C');
+  EXPECT_EQ(pr[4], 64); // Second tag has offset 64
+  EXPECT_EQ(pr[5], 0);
+  EXPECT_EQ(pr[6], 0);
+  EXPECT_EQ(pr[7], 0);
+  EXPECT_EQ(pr[8], 'N'); // First data (at offset zero) has tag nonc
+  EXPECT_EQ(pr[9], 'O');
+  EXPECT_EQ(pr[10], 'N');
+  EXPECT_EQ(pr[11], 'C');
+  EXPECT_EQ(pr[12], 'P'); // Second data (at offset 64) has tag PAD
+  EXPECT_EQ(pr[13], 'A');
+  EXPECT_EQ(pr[14], 'D');
+  EXPECT_EQ(pr[15], 0xff);
 
   EXPECT_EQ(pr[1023], 0xff);
 }
@@ -97,32 +113,34 @@ TEST(TestRt, SendRequest){
   RtClient rt;
   std::ustring req;
   rt.GenerateRequest(req);
-  ASSERT_EQ(req.length(), 64 + 8);
+  ASSERT_EQ(req.length(), 80);
   rt.PadRequest(req, req);
   ASSERT_EQ(req.length(), 1024);
   const uint8_t *pr = req.data();
-  EXPECT_EQ(pr[0], 1);
+  EXPECT_EQ(pr[0], 2); // 2 tags
   EXPECT_EQ(pr[1], 0);
   EXPECT_EQ(pr[2], 0);
   EXPECT_EQ(pr[3], 0);
-  EXPECT_EQ(pr[4], 'N');
-  EXPECT_EQ(pr[5], 'O');
-  EXPECT_EQ(pr[6], 'N');
-  EXPECT_EQ(pr[7], 'C');
+  EXPECT_EQ(pr[4], 64); // Second tag has offset 64
+  EXPECT_EQ(pr[5], 0);
+  EXPECT_EQ(pr[6], 0);
+  EXPECT_EQ(pr[7], 0);
+  EXPECT_EQ(pr[8], 'N'); // First data (at offset zero) has tag nonc
+  EXPECT_EQ(pr[9], 'O');
+  EXPECT_EQ(pr[10], 'N');
+  EXPECT_EQ(pr[11], 'C');
+  EXPECT_EQ(pr[12], 'P'); // Second data (at offset 64) has tag PAD
+  EXPECT_EQ(pr[13], 'A');
+  EXPECT_EQ(pr[14], 'D');
+  EXPECT_EQ(pr[15], 0xff);
 
 
   QueueBase &p = GetQueueToIp("roughtime.cloudflare.com", 2002);
-  //p.Write(req.data(), req.length());
   const uint8_t packet[] = { 2,0,0,0,64,0,0,0,78,79,78,67,80,65,68,255,5,83,77,186,201,145,69,152,83,175,116,202,170,224,249,101,238,22,56,197,147,36,14,207,95,96,87,228,209,115,210,207,11,73,211,160,163,96,120,215,35,70,189,113,239,168,19,66,87,253,196,183,159,189,59,195,190,205,149,160,113,25,228,80,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
   EXPECT_EQ(sizeof(packet), 1024);
-  p.Write(packet, 1024);
-  while (!p.GetReadReady()){
-    usleep(10000);
-  }
+  p.Write(req.data(), req.length());
   
   ReleaseQueueToIp(&p);
-  
-  
   
   
 }
