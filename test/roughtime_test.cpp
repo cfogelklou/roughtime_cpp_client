@@ -155,6 +155,20 @@ TEST(TestRt, SendRequest){
 }
 #endif
 
+
+extern "C" {
+  // This is a terrible random number generator, but only for unit testing.
+  void randombytes_buf(uint8_t * const buf, const uint32_t size) {
+    for (uint32_t i = 0; i < size; i++) {
+      buf[i] = rand() & 0xff;
+    }
+  }
+
+  void sodium_misuse(void) {
+    assert(0);
+  }
+}
+
 int main(int argc, char** argv){
   
   // The following line must be executed to initialize Google Mock

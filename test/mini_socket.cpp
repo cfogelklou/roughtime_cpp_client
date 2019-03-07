@@ -20,7 +20,7 @@ typedef int SOCKET;
 #endif
 
 #include <cstdio>
-#include <string.h>
+#include <cstring>
 #include <queue>
 #include <thread>
 #include <mutex>          // std::mutex, std::unique_lock, std::defer_lock

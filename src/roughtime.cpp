@@ -1,8 +1,14 @@
 
 #include "roughtime.hpp"
+#include "crypto_sign.h"
 #include <string>
 #include <chrono>
+
 #include <assert.h>
+#define LOG_TRACE(x) std::printf x
+#define LOG_WARNING(x) std::printf x
+#define LOG_ASSERT_WARN(state) if (!(state)) \
+do { LOG_WARNING(("Assertion Failed at %s(%d)\r\n", __FILE__, __LINE__)); } while(0)
 
 #ifndef MIN
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
@@ -92,23 +98,13 @@ static uint64_t uint64(const uint8_t b[], const int i) {
   return LE64TOHOST(tmp);
 }
 
-static bool verify
- (
-  const std::ustring &sigstr,
-  void *certificateContext,
-  const std::ustring &bstring,
-  const int CERT_DELE_tagstart,
-  const int CERT_DELE_tagend,
-  const std::ustring &pubkey){
-   return true;
-}
-
+// /////////////////////////////////////////////////////////////////////////////
 static const uint8_t * subarray(
   const std::ustring &bstr,
   const size_t fromIdx,
   const size_t toIdx, // up to AND INCLUDING
-  std::ustring &out ){
-  const size_t end = MIN(toIdx, (bstr.size()-1));
+  std::ustring &out) {
+  const size_t end = MIN(toIdx, (bstr.size() - 1));
   const size_t beg = MIN(end, fromIdx);
   const int len = end - beg;
   assert(len >= 0);
@@ -117,6 +113,35 @@ static const uint8_t * subarray(
   out.assign(&b[beg], len);
   return out.data();
 }
+
+
+// /////////////////////////////////////////////////////////////////////////////
+static bool verify
+ (
+  const std::ustring &sigstr,
+  void *certificateContext,
+  const std::ustring &bstring,
+  const int tagstart,
+  const int tagend,
+  const std::ustring &pubkey
+ )
+{
+  LOG_TRACE(("Signature length = %d\r\n", sigstr.length()));
+  LOG_ASSERT_WARN(sigstr.length() == crypto_sign_ed25519_BYTES);
+  LOG_ASSERT_WARN(bstring.length() > tagend);
+  std::ustring signedStr;
+  subarray(bstring, tagstart, tagend, signedStr);
+  LOG_ASSERT_WARN((tagend - tagstart) == signedStr.length());
+  LOG_ASSERT_WARN(pubkey.length() == crypto_sign_PUBLICKEYBYTES);
+
+  int noob = crypto_sign_verify_detached(
+    sigstr.data(), 
+    signedStr.data(), 
+    signedStr.length(), 
+    pubkey.data());
+  return (0 == noob);
+}
+
 
 // /////////////////////////////////////////////////////////////////////////////
 int RtClient::Parse(
@@ -413,13 +438,14 @@ int RtClient::Parse(
 
   {
     std::ustring sigstr;
-    const uint8_t *sig = subarray(bstring, CERT_SIG_tagstart, CERT_SIG_tagend, sigstr);
+    subarray(bstring, CERT_SIG_tagstart, CERT_SIG_tagend, sigstr);
 
 #if 1
     void *certificateContext = nullptr;
     std::ustring pubkeystr;
     pubkeystr.assign(pubkey, 32);
-    if (!verify(sig, certificateContext, bstring, CERT_DELE_tagstart, CERT_DELE_tagend, pubkeystr))
+    std::ustring delegate;
+    if (!verify(sigstr, certificateContext, bstring, CERT_DELE_tagstart, CERT_DELE_tagend, pubkeystr))
     {
       return reject(b, "CERT.DELE does not verify");      
     }
