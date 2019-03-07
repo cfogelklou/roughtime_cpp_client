@@ -7,3 +7,6 @@
 [submodule "curl"]
 	path = curl
 	url = https://github.com/curl/curl
+[submodule "boost"]
+	path = boost
+	url = https://github.com/boostorg/boost.git

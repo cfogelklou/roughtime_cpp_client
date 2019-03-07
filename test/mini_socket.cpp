@@ -21,23 +21,28 @@ typedef int SOCKET;
 
 #include <cstdio>
 #include <string.h>
+#include <queue>
 #include <thread>
 #include <mutex>          // std::mutex, std::unique_lock, std::defer_lock
 
+#include "cs_task_locker.hpp"
+#include "byte_q.hpp"
+
+
+
+#ifdef WIN32
+#define OSALSleep(x) Sleep(x)
+#else
+#define OSALSleep(x) usleep((uint64_t)(x)*1000ull)
+#endif
+
 static const int DEFAULT_BUFLEN = 32768;
+#define MIN(x,y) (((x) < (y)) ? (x) : (y))
 
-static std::mutex csMutex;
 
-class CSTaskLocker {
-public:
-  CSTaskLocker() {
-    csMutex.lock();
-  }
 
-  ~CSTaskLocker() {
-    csMutex.unlock();
-  }
-};
+
+
 
 // ////////////////////////////////////////////////////////////////////////////
 class SerSocket {
@@ -86,8 +91,8 @@ public:
 
 #define LOG_TRACE(x) std::printf x
 #define LOG_WARNING(x) std::printf x
-#define LOG_ASSERT_WARN(state) if (!state) \
-  do { LOG_WARNING("Assertion Failed at %s(%d)\r\n", __FILE__, __LINE) } while(0)
+#define LOG_ASSERT_WARN(state) if (!(state)) \
+do { LOG_WARNING(("Assertion Failed at %s(%d)\r\n", __FILE__, __LINE__)); } while(0)
 
 // /////////////////////////////////
 class SerSocketQueue {
@@ -101,7 +106,6 @@ private:
   std::thread *mpAcceptThread;
   const size_t recvbuflen;
   uint8_t recvbuf[DEFAULT_BUFLEN];
-  uint8_t rxCircBuf[DEFAULT_BUFLEN * 4];
 
 
 public:
@@ -110,13 +114,13 @@ public:
   (const int port)
     : mListenSocket(INVALID_SOCKET)
     , mNextCommsSocket(INVALID_SOCKET)
-    , mRxByteQ(rxCircBuf, sizeof(rxCircBuf))
+    , mRxByteQ()
     , mRunning(true)
     , mSocketCount(0)
     , mPort(port)
     , mpAcceptThread(nullptr)
     , recvbuflen(sizeof(recvbuf))
-    , recvbuf{ 0 }, rxCircBuf{ 0 }
+    , recvbuf{ 0 }
   {
     SerSocket::inst().Init();
     setupPort(true, mPort);
