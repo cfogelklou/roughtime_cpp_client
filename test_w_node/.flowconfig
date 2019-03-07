@@ -1,0 +1,14 @@
+[ignore]
+.*/compiled/*/.*
+#.*/reactnative/**/*.*
+
+[include]
+.*/reactnative/app/*.*
+
+[libs]
+
+[lints]
+
+[options]
+
+[strict]
