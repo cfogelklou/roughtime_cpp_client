@@ -42,12 +42,10 @@ static const int DEFAULT_BUFLEN = 2048;
 // ////////////////////////////////////////////////////////////////////////////
 class SerSocket {
 public:
-
   static SerSocket &inst() {
     static SerSocket local;
     return local;
   }
-
 
   void Init() {
     //Nothing to do here...
@@ -95,13 +93,11 @@ public:
   
   
   const size_t BUFLEN = 2048;//  //Max length of buffer
-  //const int PORT = 2002;//8888  //The port on which to listen for incoming data
   
   SerSocketQueue(const char *szAddr, const int port)
   : QueueBase()
   , mSocket(INVALID_SOCKET)
   , mRxByteQ()
-  , mPort(port)
   , mRxBuf{ 0 }
   {
     SerSocket::inst().Init();
@@ -116,20 +112,15 @@ public:
     // Resolve the server address and port
     char szPort[100];
     snprintf(szPort, sizeof(szPort), "%d", port);
-    int result = getaddrinfo(szAddr, szPort, &hints, &rxResult);
+    int result = getaddrinfo(szAddr, szPort, &hints, &mpAddrInfo);
     if (result != 0) {
       LOG_TRACE(("getaddrinfo failed with error: %d \r\n", result));
       fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(result));
       exit(EXIT_FAILURE);
     }
         
-    //Initialise winsock
-    printf("\nInitialising Winsock...");
-    SerSocket::inst().Init();
-    printf("Initialised.\n");
-    
     //Create a socket
-    if((mSocket = socket(rxResult->ai_family, rxResult->ai_socktype, rxResult->ai_protocol )) == INVALID_SOCKET){
+    if((mSocket = socket(mpAddrInfo->ai_family, mpAddrInfo->ai_socktype, mpAddrInfo->ai_protocol )) == INVALID_SOCKET){
       fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(mSocket));
       exit(-1);
     }
@@ -138,13 +129,14 @@ public:
 
   // //////////////////////////////////////////////////////////////////////////
   ~SerSocketQueue(){
-    freeaddrinfo(rxResult);    
+    freeaddrinfo(mpAddrInfo);    
+    SerSocket::inst().sockClose(mSocket);
   }
 
   // //////////////////////////////////////////////////////////////////////////
   size_t Write(const uint8_t arr[], const size_t len) override {
 
-    if (sendto(mSocket, (const char *)arr, len, 0, rxResult->ai_addr, rxResult->ai_addrlen) == SOCKET_ERROR) {
+    if (sendto(mSocket, (const char *)arr, len, 0, mpAddrInfo->ai_addr, mpAddrInfo->ai_addrlen) == SOCKET_ERROR) {
       auto err = WSAGetLastError();
       fprintf(stderr, "send: %s\n", gai_strerror(err));
       //printf("sendto() failed with error code : %d" , WSAGetLastError());
@@ -153,8 +145,8 @@ public:
     else {
       static int timeout = 100;
       if (0 == setsockopt(mSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout))){
-        int server_length = rxResult->ai_addrlen;
-        auto rx = recvfrom(mSocket, (char *)mRxBuf, sizeof(mRxBuf), 0, rxResult->ai_addr, &server_length);
+        int server_length = mpAddrInfo->ai_addrlen;
+        auto rx = recvfrom(mSocket, (char *)mRxBuf, sizeof(mRxBuf), 0, mpAddrInfo->ai_addr, &server_length);
         if (SOCKET_ERROR != rx) {
           mRxByteQ.Write(mRxBuf, rx);
         }
@@ -185,21 +177,20 @@ public:
 
 
 private:
-  struct addrinfo *rxResult;
-  SOCKET mSocket; ///< Wait for connections on this socket.
-  ByteQ   mRxByteQ;
-  int mPort;
-  uint8_t mRxBuf[DEFAULT_BUFLEN];
+  struct addrinfo  *mpAddrInfo;
+  SOCKET            mSocket;
+  ByteQ             mRxByteQ;
+  uint8_t           mRxBuf[DEFAULT_BUFLEN];
 };
 
 // ////////////////////////////////////////////////////////////////////////////
-QueueBase &GetQueueToIp(const char *szAddr, const int port){
+QueueBase &CreateUdpClient(const char *szAddr, const int port){
   auto p = new SerSocketQueue(szAddr, port);
   return *p;
 }
 
 // ////////////////////////////////////////////////////////////////////////////
-void ReleaseQueueToIp(QueueBase *p){
+void DeleteUdpClient(QueueBase *p){
   SerSocketQueue *ps = (SerSocketQueue *)p;
   delete ps;
 }

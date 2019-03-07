@@ -133,18 +133,20 @@ TEST(TestRt, SendRequest){
   EXPECT_EQ(pr[13], 'A');
   EXPECT_EQ(pr[14], 'D');
   EXPECT_EQ(pr[15], 0xff);
+  EXPECT_EQ(pr[1023], 0xff);
 
 
-  QueueBase &p = GetQueueToIp("roughtime.cloudflare.com", 2002);
+  QueueBase &p = CreateUdpClient("roughtime.cloudflare.com", 2002);
   p.Write(req.data(), req.length());
   const size_t bytes = p.GetReadReady();
+  EXPECT_GT(bytes, 0u);
   if (bytes) {
     uint8_t buf[1024];
     auto amtRead = p.Read(buf, bytes);
     EXPECT_EQ(amtRead, bytes);
   }
   
-  ReleaseQueueToIp(&p);
+  DeleteUdpClient(&p);
   
   
 }
