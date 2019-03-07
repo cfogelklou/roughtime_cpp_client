@@ -34,10 +34,13 @@ typedef int SOCKET;
 #define OSALSleep(x) Sleep(x)
 #else
 #define OSALSleep(x) usleep((uint64_t)(x)*1000ull)
+#define WSAGetLastError() errno
 #endif
 
 static const int DEFAULT_BUFLEN = 2048;
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
+
+
 
 // ////////////////////////////////////////////////////////////////////////////
 class SerSocket {
@@ -114,18 +117,16 @@ public:
     snprintf(szPort, sizeof(szPort), "%d", port);
     int result = getaddrinfo(szAddr, szPort, &hints, &mpAddrInfo);
     if (result != 0) {
-      LOG_TRACE(("getaddrinfo failed with error: %d \r\n", result));
-      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(result));
+      LOG_TRACE(("getaddrinfo: %s\n", gai_strerror(result)));
       exit(EXIT_FAILURE);
     }
         
     //Create a socket
     if((mSocket = socket(mpAddrInfo->ai_family, mpAddrInfo->ai_socktype, mpAddrInfo->ai_protocol )) == INVALID_SOCKET){
       auto err = WSAGetLastError();
-      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(err));
+      LOG_TRACE(("socket: %s\n", gai_strerror(err)));
       exit(-1);
     }
-    printf("Socket created.\n");
   }
 
   // //////////////////////////////////////////////////////////////////////////
@@ -141,30 +142,32 @@ public:
     ok = (stat == len);
     if (!ok) {
       auto err = WSAGetLastError();
-      fprintf(stderr, "send: %s\n", gai_strerror(err));
+      LOG_TRACE(("send: %s\n", gai_strerror(err)));
       //printf("sendto() failed with error code : %d" , WSAGetLastError());
       exit(EXIT_FAILURE);
     }
 
+#ifdef WIN32
     if (ok) {
       static int timeout = 1000;
       stat = setsockopt(mSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
       ok = (stat != SOCKET_ERROR);
     }
+#endif
 
     if (ok){
 
       // Use thread to read from socket to prevent blocking.
       auto readFromSocketThreadC = [](void *pThis) {
         SerSocketQueue &ssq = *(SerSocketQueue *)pThis;
-        int server_length = ssq.mpAddrInfo->ai_addrlen;
+        socklen_t server_length = ssq.mpAddrInfo->ai_addrlen;
         int rx = recvfrom(ssq.mSocket, (char *)ssq.mRxBuf, sizeof(ssq.mRxBuf), 0, ssq.mpAddrInfo->ai_addr, &server_length);
         if (SOCKET_ERROR != rx) {
           ssq.mRxByteQ.Write(ssq.mRxBuf, rx);
         }
         else {
           const int err = WSAGetLastError();
-          fprintf(stderr, "recv: %s\n", gai_strerror(err));
+          LOG_TRACE(("recv: %s\n", gai_strerror(err)));
         }
       };
 
