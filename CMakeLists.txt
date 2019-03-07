@@ -40,7 +40,7 @@ include_directories(
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
-target_link_libraries(${PROJECT_NAME} curl)
+# target_link_libraries(${PROJECT_NAME} curl)
 if (WIN32)
     target_link_libraries(${PROJECT_NAME} ws2_32)
 else (WIN32)
