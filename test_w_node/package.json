@@ -6,6 +6,7 @@
   "scripts": {
     "test": "go",
     "buildexe": "babel app -d compiled/app",
+    "build": "npm run buildexe",
     "inspect": "nodemon --inspect compiled/app/main_compiled.js"
   },
   "author": "Chris Fogelklou",
