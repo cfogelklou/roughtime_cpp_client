@@ -44,6 +44,13 @@ public:
   void GenerateRequest(std::ustring &request);
   
   static void PadRequest(const std::ustring &unpadded, std::ustring &padded);
+
+  static int RtClient::Parse(
+    const uint8_t pubkey[32],
+    const uint8_t nonce[64],
+    const uint8_t b[],
+    const size_t b_length
+  );
   
 private:
   uint8_t nonce[64];
