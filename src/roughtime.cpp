@@ -71,22 +71,26 @@ void RtClient::PadRequest(
 
 }
 
+// /////////////////////////////////////////////////////////////////////////////
 static int reject(const uint8_t b[], const char *message) {
   return -1;
 }
 
+// /////////////////////////////////////////////////////////////////////////////
 static uint32_t uint32(const uint8_t b[], const int i) {
   uint32_t tmp;
   memcpy(&tmp, &b[i], sizeof(tmp));
   return LE32TOHOST(tmp);
 }
 
+// /////////////////////////////////////////////////////////////////////////////
 static uint64_t uint64(const uint8_t b[], const int i) {
   uint64_t tmp;
   memcpy(&tmp, &b[i], sizeof(tmp));
   return LE64TOHOST(tmp);
 }
 
+// /////////////////////////////////////////////////////////////////////////////
 int RtClient::Parse(
   const uint8_t pubkey[32],
   const uint8_t nonce[64],
@@ -128,8 +132,8 @@ int RtClient::Parse(
     return reject(b, "short message");
   }
 
-done:
-  for (;;) {
+  bool done = false;
+  while(!done) {
     if (i + 4 > n) {
       return reject(b, "short message");
     }
@@ -208,7 +212,7 @@ done:
           SREP_tagend = tagend;
           break;
         }
-        break;
+        break; // case 0:
 
       case 1: // CERT
         switch (tag) {
@@ -221,7 +225,7 @@ done:
           CERT_SIG_tagend = tagend;
           break;
         }
-        break;
+        break; // case 1: // CERT
 
       case 2: // CERT_DELE
         switch (tag) {
@@ -238,7 +242,7 @@ done:
           CERT_DELE_PUBK_tagend = tagend;
           break;
         }
-        break;
+        break; // case 2: // CERT_DELE
 
       case 3: // SREP
         switch (tag) {
@@ -257,7 +261,7 @@ done:
         }
         break;
       }
-    }
+    } // for (int j = firsttag; j < lasttag; j += 4, tagstart = tagend) {
 
     switch (s) {
     case 0: // toplevel
@@ -371,9 +375,10 @@ done:
         return reject(b, "bad SREP.ROOT tag");
       }
 
+      done = true;
       break /*done*/;
     }
-  }
+  } // for (;;)
 
 #if 0
   {
