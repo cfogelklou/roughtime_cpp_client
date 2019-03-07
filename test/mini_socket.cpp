@@ -89,7 +89,7 @@ public:
 #define LOG_ASSERT_WARN(state) if (!(state)) \
 do { LOG_WARNING(("Assertion Failed at %s(%d)\r\n", __FILE__, __LINE__)); } while(0)
 
-#if 1
+
 class SerSocketQueue: public QueueBase {
 public:
   
@@ -112,7 +112,11 @@ public:
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_protocol = IPPROTO_UDP;
-    hints.ai_flags = AI_PASSIVE;
+    //hints.ai_flags = AI_PASSIVE;
+    hints.ai_family=AF_INET;
+    hints.ai_socktype=SOCK_DGRAM;
+    hints.ai_flags=0;
+    hints.ai_protocol = IPPROTO_UDP;
     
     // Resolve the server address and port
     struct addrinfo *rxResult = NULL;
@@ -125,7 +129,6 @@ public:
       return;
     }
     
-    static struct sockaddr_in server;
     
     //Initialise winsock
     printf("\nInitialising Winsock...");
@@ -138,20 +141,26 @@ public:
       exit(-1);
     }
     printf("Socket created.\n");
-    
+#if 1
+#if 1
     //Prepare the sockaddr_in structure
+    static struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = INADDR_ANY;
     server.sin_port = htons( mPort );
     
     //Bind
     if( bind(mSocket ,(struct sockaddr *)&server , sizeof(server)) == SOCKET_ERROR)
+#else
+    if ( bind(mSocket, rxResult->ai_addr, rxResult->ai_addrlen) == SOCKET_ERROR)
+#endif
     {
       //printf("Bind failed with error code : %d" , WSAGetLastError());
       fprintf(stderr, "bind: %s\n", gai_strerror(mSocket));
       exit(EXIT_FAILURE);
     }
     puts("Bind done");
+#endif
 
     std::thread t(readFromSocketThreadC, this); // pass by reference
     t.detach();
@@ -225,252 +234,7 @@ private:
   uint8_t recvbuf[DEFAULT_BUFLEN];
 };
 
-#else
-// /////////////////////////////////
-class SerSocketQueue : public QueueBase{
-private:
-  SOCKET mListenSocket; ///< Wait for connections on this socket.
-  SOCKET mNextCommsSocket; /// Receive data on this socket.
-  ByteQ   mRxByteQ;
-  volatile bool mRunning;
-  volatile int mSocketCount;
-  int mPort;
-  std::thread *mpAcceptThread;
-  const size_t recvbuflen;
-  uint8_t recvbuf[DEFAULT_BUFLEN];
 
-
-public:
-  // /////////////////////////////////
-  SerSocketQueue(
-    const char *szAddr,
-    const int port)
-    : mListenSocket(INVALID_SOCKET)
-    , mNextCommsSocket(INVALID_SOCKET)
-    , mRxByteQ()
-    , mRunning(true)
-    , mSocketCount(0)
-    , mPort(port)
-    , mpAcceptThread(nullptr)
-    , recvbuflen(sizeof(recvbuf))
-    , recvbuf{ 0 }
-  {
-    SerSocket::inst().Init();
-    setupPort(szAddr, true, mPort);
-
-    // Create a thread for listening for incoming connections.
-    //mpAcceptThread = new std::thread(nextRxConnectionC, this);
-    //mpAcceptThread->detach();
-
-  }
-
-  // /////////////////////////////////
-  ~SerSocketQueue() {
-    SerSocket::inst().sockClose(mListenSocket);
-    mRunning = false;
-    mSocketCount += 100;
-    // No longer need server socket
-    mpAcceptThread->join();
-    delete mpAcceptThread;
-  }
-
-private:
-
-  void setupPort(const char *szAddr, const bool isRxPort, const int port) {
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = IPPROTO_UDP;
-    hints.ai_flags = AI_PASSIVE;
-
-    // Resolve the server address and port
-    struct addrinfo *rxResult = NULL;
-    char szPort[100];
-    snprintf(szPort, sizeof(szPort), "%d", port);
-    int result = getaddrinfo(szAddr, szPort, &hints, &rxResult);
-    if (result != 0) {
-      LOG_TRACE(("getaddrinfo failed with error: %d \r\n", result));
-      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(result));
-      return;
-    }
-
-    if (isRxPort) {
-      // Create a SOCKET for connecting to server
-      mListenSocket = socket(rxResult->ai_family, rxResult->ai_socktype, rxResult->ai_protocol);
-      if (mListenSocket == INVALID_SOCKET) {
-        LOG_TRACE(("socket failed with error \r\n"));
-        freeaddrinfo(rxResult);
-        return;
-      }
-
-      // Setup the UDP listening socket
-      if (hints.ai_protocol != IPPROTO_UDP){
-        // TCP Only
-        result = bind(mListenSocket, rxResult->ai_addr, (int)rxResult->ai_addrlen);
-        if (result == SOCKET_ERROR) {
-          LOG_TRACE(("listen failed with error \r\n"));
-          fprintf(stderr, "bind: %s\n", gai_strerror(result));
-          freeaddrinfo(rxResult);
-          SerSocket::inst().sockClose(mListenSocket);
-          return;
-        }
-      }
-
-      freeaddrinfo(rxResult);
-
-      result = listen(mListenSocket, SOMAXCONN);
-      if (result == SOCKET_ERROR) {
-        LOG_TRACE(("listen failed with error \r\n"));
-        fprintf(stderr, "listen: %s\n", gai_strerror(result));
-        SerSocket::inst().sockClose(mListenSocket);
-        return;
-      }
-    }
-  }
-
-  // /////////////////////////////////
-  static void readFromSocketThreadC(void *pThis) {
-    ((SerSocketQueue *)pThis)->readFromSocketThread();
-  }
-
-  // /////////////////////////////////
-  void readFromSocketThread()
-  {
-    const int socketCount = mSocketCount;
-    SOCKET clientSocket = mNextCommsSocket;
-    // Receive until the peer shuts down the connection
-    int bytesReceived = 1;
-    while ((mNextCommsSocket != INVALID_SOCKET) && (bytesReceived > 0) && (socketCount == mSocketCount)) {
-      bytesReceived = recv(clientSocket, (char *)recvbuf, recvbuflen - 1, 0);
-      if (bytesReceived > 0) {
-        CSTaskLocker cs;
-        auto amtWritten = mRxByteQ.Write(recvbuf, bytesReceived);
-        LOG_ASSERT_WARN(amtWritten == bytesReceived);
-      }
-      else if (bytesReceived == 0) {
-        // Do nothing
-      }
-      else {
-        LOG_TRACE(("recv failed with error\r\n"));
-      }
-    }
-
-    if (clientSocket == mNextCommsSocket) {
-      // shutdown the connection since we're done
-      bytesReceived = SerSocket::inst().sockClose(clientSocket);
-      if (bytesReceived == SOCKET_ERROR) {
-        LOG_TRACE(("shutdown failed with error\r\n"));
-      }
-      LOG_TRACE(("readFromSocketThread thread exiting.\r\n"));
-    }
-  }
-
-#if 0
-  // /////////////////////////////////
-  static void nextRxConnectionC(void *pThis) {
-    ((SerSocketQueue *)pThis)->nextRxConnection();
-  }
-
-
-  // /////////////////////////////////
-  // This thread constantly accepts new connections
-  void nextRxConnection() {
-    while (mRunning) {
-      // Accept a client socket
-      mNextCommsSocket = accept(mListenSocket, NULL, NULL);
-      if (mNextCommsSocket == INVALID_SOCKET) {
-        auto what = GetLastError();
-        LOG_TRACE(("accept failed with error %u\r\n", what));
-      }
-      else {
-        {
-          CSTaskLocker cs;
-          mSocketCount++;
-        }
-        std::thread t(readFromSocketThreadC, this); // pass by reference
-        t.detach();
-      }
-      OSALSleep(1000);
-    }
-  }
-#endif
-
-  typedef struct SendBufTag {
-    struct {
-      uint32_t numBytes;
-      SerSocketQueue *pThis;
-    } hdr;
-    uint8_t payload[4];
-  } SendBufT;
-
-  // /////////////////////////////////
-  void sendThread(SendBufT *p) {
-#if 0
-    // Handle transmission on the send socket.
-    if (mNextCommsSocket != INVALID_SOCKET) {
-      SOCKET clientSocket = mNextCommsSocket;
-      int result = send(clientSocket, (char *)p->payload, p->hdr.numBytes, 0);
-      if (result == SOCKET_ERROR) {
-        mNextCommsSocket = INVALID_SOCKET;
-        LOG_WARNING(("Could not send to socket.\r\n"));
-        //SerSocket::inst().sockClose(clientSocket);
-      }
-    }
-    free(p);
-#else
-    // Handle transmission on the send socket.
-    SOCKET clientSocket = mListenSocket;
-    int result = send(clientSocket, (char *)p->payload, p->hdr.numBytes, 0);
-    if (result == SOCKET_ERROR) {
-      mNextCommsSocket = INVALID_SOCKET;
-      LOG_WARNING(("Could not send to socket.\r\n"));
-      //SerSocket::inst().sockClose(clientSocket);
-    }
-    free(p);
-#endif
-  }
-
-  static void sendThreadC(void *p) {
-    ((SendBufT *)p)->hdr.pThis->sendThread((SendBufT *)p);
-  }
-
-  // //////////////////////////////////////////////////////////////////////////
-  // Write function, returns amount written.  Does not trigger a callback as
-  // it is typically implemented using a FIFO.
-  size_t Write(const uint8_t *const pBytes, const size_t numBytes) override {
-    if (mNextCommsSocket != INVALID_SOCKET) {
-      SendBufT *pThreadData = (SendBufT *)malloc(sizeof(SendBufT::hdr) + numBytes);
-      pThreadData->hdr.pThis = this;
-      pThreadData->hdr.numBytes = numBytes;
-      memcpy(pThreadData->payload, pBytes, numBytes);
-      std::thread t(sendThreadC, pThreadData);
-      t.detach();
-    }
-    return numBytes;
-  }
-
-  // //////////////////////////////////////////////////////////////////////////
-  // Get Write Ready.  Returns amount that can be written.
-  size_t GetWriteReady() override{
-    return DEFAULT_BUFLEN;
-  }
-
-  // //////////////////////////////////////////////////////////////////////////
-  // Read function - returns amount available.  Typically uses an internal FIFO.
-  size_t Read(uint8_t *const pBytes, const size_t numBytes) override {
-    CSTaskLocker cs;
-    return mRxByteQ.Read(pBytes, numBytes);
-  }
-
-  // Get the number of bytes that can be read.
-  size_t  GetReadReady() override{
-    CSTaskLocker cs;
-    return mRxByteQ.GetReadReady();
-  }
-
-};
-#endif
 
 QueueBase &GetQueueToIp(const char *szAddr, const int port){
   auto p = new SerSocketQueue(szAddr, port);

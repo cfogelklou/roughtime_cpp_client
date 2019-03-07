@@ -53,8 +53,8 @@ void RtClient::PadRequest(
   const std::ustring &unpadded,
   std::ustring &padded)
 {
-  padded.clear();
   if (((void *)&unpadded) != ((void *)&padded)){
+    padded.clear();
     padded.insert(0, unpadded.data(), sizeof(RtRequestT));
   }
   else {

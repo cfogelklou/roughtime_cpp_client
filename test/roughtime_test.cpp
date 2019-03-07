@@ -26,15 +26,28 @@ TEST(TestRt, UnpaddedRequest){
   RtClient rt;
   std::ustring req;
   rt.GenerateRequest(req);
-  EXPECT_EQ(req.length(), 64 + 4);
+  ASSERT_EQ(req.length(), 64 + 4);
+  const uint8_t *pr = req.data();
+  EXPECT_EQ(pr[0], 'N');
+  EXPECT_EQ(pr[1], 'O');
+  EXPECT_EQ(pr[2], 'N');
+  EXPECT_EQ(pr[3], 'C');
+
 }
 
 TEST(TestRt, PaddedRequest){
   RtClient rt;
   std::ustring req;
   rt.GenerateRequest(req);
+  ASSERT_EQ(req.length(), 64 + 4);
   rt.PadRequest(req, req);
-  EXPECT_EQ(req.length(), 1024);
+  ASSERT_EQ(req.length(), 1024);
+  const uint8_t *pr = req.data();
+  EXPECT_EQ(pr[0], 'N');
+  EXPECT_EQ(pr[1], 'O');
+  EXPECT_EQ(pr[2], 'N');
+  EXPECT_EQ(pr[3], 'C');
+  EXPECT_EQ(pr[1023], 0xff);
 }
 
 #include "mini_socket.hpp"
@@ -43,9 +56,15 @@ TEST(TestRt, SendRequest){
   RtClient rt;
   std::ustring req;
   rt.GenerateRequest(req);
+  ASSERT_EQ(req.length(), 64 + 4);
   rt.PadRequest(req, req);
-  EXPECT_EQ(req.length(), 1024);
-  
+  ASSERT_EQ(req.length(), 1024);
+  const uint8_t *pr = req.data();
+  EXPECT_EQ(pr[0], 'N');
+  EXPECT_EQ(pr[1], 'O');
+  EXPECT_EQ(pr[2], 'N');
+  EXPECT_EQ(pr[3], 'C');
+
   QueueBase &p = GetQueueToIp("roughtime.cloudflare.com", 2002);
   p.Write(req.data(), req.length());
   while (!p.GetReadReady()){
