@@ -135,29 +135,37 @@ public:
 
   // //////////////////////////////////////////////////////////////////////////
   size_t Write(const uint8_t arr[], const size_t len) override {
-
-    if (sendto(mSocket, (const char *)arr, len, 0, mpAddrInfo->ai_addr, mpAddrInfo->ai_addrlen) == SOCKET_ERROR) {
+    bool ok = true;
+    int stat = sendto(mSocket, (const char *)arr, len, 0, mpAddrInfo->ai_addr, mpAddrInfo->ai_addrlen);
+    ok = (stat == len);
+    if (!ok) {
       auto err = WSAGetLastError();
       fprintf(stderr, "send: %s\n", gai_strerror(err));
       //printf("sendto() failed with error code : %d" , WSAGetLastError());
       exit(EXIT_FAILURE);
     }
-    else {
+
+    if (ok) {
       static int timeout = 100;
-      if (0 == setsockopt(mSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout))){
-        int server_length = mpAddrInfo->ai_addrlen;
-        auto rx = recvfrom(mSocket, (char *)mRxBuf, sizeof(mRxBuf), 0, mpAddrInfo->ai_addr, &server_length);
-        if (SOCKET_ERROR != rx) {
-          mRxByteQ.Write(mRxBuf, rx);
-        }
-        else {
-          auto err = WSAGetLastError();
-          fprintf(stderr, "recv: %s\n", gai_strerror(err));
-          exit(EXIT_FAILURE);
-        }
+      stat = setsockopt(mSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout));
+      ok = (stat != SOCKET_ERROR);
+    }
+
+    if (ok){
+      ok = false;
+      int server_length = mpAddrInfo->ai_addrlen;
+      int rx = recvfrom(mSocket, (char *)mRxBuf, sizeof(mRxBuf), 0, mpAddrInfo->ai_addr, &server_length);
+      if (SOCKET_ERROR != rx) {
+        ok = (rx == mRxByteQ.Write(mRxBuf, rx));
+      }
+      else {
+        stat = -1;
+        auto err = WSAGetLastError();
+        fprintf(stderr, "recv: %s\n", gai_strerror(err));
+        exit(EXIT_FAILURE);
       }
     }
-    return 0;
+    return (ok) ? len : 0;
   }
 
   // //////////////////////////////////////////////////////////////////////////
