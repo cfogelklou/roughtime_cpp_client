@@ -194,7 +194,7 @@ public:
       static int timeout = 100;
       if (0 == setsockopt(mSocket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout))){
         int server_length = rxResult->ai_addrlen;
-        auto rx = recvfrom(mSocket, (char *)recvbuf, 1, 0, rxResult->ai_addr, &server_length);
+        auto rx = recvfrom(mSocket, (char *)recvbuf, sizeof(recvbuf), 0, rxResult->ai_addr, &server_length);
         if (SOCKET_ERROR != rx) {
 
         }
