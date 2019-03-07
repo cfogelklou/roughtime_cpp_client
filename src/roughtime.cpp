@@ -154,15 +154,16 @@ const char certificateContext[] = "RoughTime v1 delegation signature--";
 const char signedResponseContext[] = "RoughTime v1 response signature";
 
 // /////////////////////////////////////////////////////////////////////////////
-int RtClient::Parse(
+uint64_t RtClient::Parse(
   const uint8_t pubkey[32],
   const uint8_t nonce[64],
   const uint8_t b[],
-  const size_t b_length
-  ) {
+  const size_t b_length,
+  ParseOutT * const pOut
+) {
   std::ustring bstring;
   bstring.assign(b, b_length);
-  
+
   int CERT_tagstart = -1;
   int CERT_tagend = -1;
   int INDX_tagstart = -1;
@@ -199,7 +200,7 @@ int RtClient::Parse(
   }
 
   bool done = false;
-  while(!done) {
+  while (!done) {
     if (i + 4 > n) {
       return reject(b, "short message");
     }
@@ -453,10 +454,10 @@ int RtClient::Parse(
     std::ustring pubkeystr;
     pubkeystr.assign(pubkey, 32);
     std::ustring delegate;
-    std::ustring certificateContextStr((uint8_t *)certificateContext, strlen(certificateContext)+1);
+    std::ustring certificateContextStr((uint8_t *)certificateContext, strlen(certificateContext) + 1);
     if (!verify(sigstr, certificateContextStr, bstring, CERT_DELE_tagstart, CERT_DELE_tagend, pubkeystr))
     {
-      return reject(b, "CERT.DELE does not verify");      
+      return reject(b, "CERT.DELE does not verify");
     }
 
   }
@@ -493,76 +494,99 @@ int RtClient::Parse(
   }
   printf("\r\nhi\r\n");
 #endif 
-#if 0
 
-    const pathlen = PATH_tagend - PATH_tagstart
-    if (pathlen > 0) {
-      let index = uint32(b, INDX_tagstart)
 
-        for (let j = 0; j < pathlen; j += 64) {
-          let l = b.subarray(PATH_tagstart + j, PATH_tagstart + j + 64)
-            let r = h
+  const auto pathlen = PATH_tagend - PATH_tagstart;
+  if (pathlen > 0) {
+    int32_t index = uint32(b, INDX_tagstart);
 
-            if (index & 1 == = 0) {
-              [l, r] = [r, l]
-            }
+    for (int j = 0; j < pathlen; j += 64) {
+      std::ustring lStr;
+      subarray(bstring, PATH_tagstart + j, PATH_tagstart + j + 64, lStr);
+      const uint8_t *l = lStr.data();
 
-          h = createHash("sha512").
-            update(one).
-            update(l).
-            update(r).
-            digest()
+      //let r = h
+      const uint8_t *r = h;
 
-            index >>>= 1
-        }
-    }
-
-  {
-    let i = 0
-
-      for (let j = 0; j < 64; j++) {
-        i ^= h[j]
-          i ^= b[j + SREP_ROOT_tagstart]
+      if ((index & 1) == 0) {
+        //[l, r] = [r, l]
+        const uint8_t *lTmp = l;
+        l = r;
+        r = lTmp;
       }
 
-    if (i != = 0) {
-      return reject(b, "ROOT does not verify")
+      // h = createHash("sha512").update(one).update(l).update(r).digest()
+      {
+        crypto_hash_sha512_state sha;
+        crypto_hash_sha512_init(&sha);
+        const uint8_t one[1] = { 1 };
+        crypto_hash_sha512_update(&sha, one, sizeof(one));
+        crypto_hash_sha512_update(&sha, l, 64);
+        crypto_hash_sha512_update(&sha, r, 64);
+        crypto_hash_sha512_final(&sha, h);
+      }
+
+#if 0
+      for (int i = 0; i < sizeof(h); i += 8) {
+        printf("%d, %d, %d, %d, %d, %d, %d, %d, \r\n"
+          , h[i + 0], h[i + 1], h[i + 2], h[i + 3]
+          , h[i + 4], h[i + 5], h[i + 6], h[i + 7]
+        );
+      }
+#endif 
+      index >>= 1;
     }
   }
 
-  let midpoint
-    let mintime
-    let maxtime
-    let ok
+  {
+    uint32_t i = 0;
 
+    for (int j = 0; j < 64; j++) {
+      i ^= h[j];
+      i ^= b[j + SREP_ROOT_tagstart];
+    }
+
+    if (i != 0) {
+      return reject(b, "ROOT does not verify");
+    }
+  }
+
+  uint64_t midpoint, mintime, maxtime;
+  const uint64_t deepFuture = 2097152ull << 32ull;
     // TODO(bnoordhuis) switch to BigInt before 2255 AD
-    if ([midpoint, ok] = uint64(b, SREP_MIDP_tagstart), !ok) {
-      return reject(b, "deep future midpoint")
-    }
+  midpoint = uint64(b, SREP_MIDP_tagstart);
+  if (midpoint > deepFuture)
+    return reject(b, "deep future midpoint");
 
-  if ([mintime, ok] = uint64(b, CERT_DELE_MINT_tagstart), !ok) {
-    return reject(b, "deep future mintime")
-  }
+  mintime = uint64(b, CERT_DELE_MINT_tagstart);
+  if (mintime > deepFuture)
+    return reject(b, "deep future mintime");
 
-  if ([maxtime, ok] = uint64(b, CERT_DELE_MAXT_tagstart), !ok) {
-    return reject(b, "deep future maxtime")
-  }
+  maxtime = uint64(b, CERT_DELE_MAXT_tagstart);
+  if (maxtime > deepFuture)
+    return reject(b, "deep future maxtime");
 
   if (maxtime < mintime) {
-    return reject(b, "maxtime < mintime")
+    return reject(b, "maxtime < mintime");
   }
 
   if (midpoint < mintime) {
-    return reject(b, "midpoint < mintime")
+    return reject(b, "midpoint < mintime");
   }
 
   if (midpoint > maxtime) {
-    return reject(b, "midpoint > maxtime")
+    return reject(b, "midpoint > maxtime");
+  }
+  
+  const uint32_t radius = uint32(b, SREP_RADI_tagstart);
+
+  if (pOut) {
+    pOut->maxtime = maxtime;
+    pOut->mintime = mintime;
+    pOut->midpoint = midpoint;
+    pOut->radius = radius;
   }
 
-  const radius = uint32(b, SREP_RADI_tagstart)
-
-    return[midpoint, radius, null]
-#endif
-  return 0;
+  return midpoint;// midpoint, radius, null]
+    
 }

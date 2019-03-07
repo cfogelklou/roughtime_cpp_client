@@ -45,11 +45,19 @@ public:
   
   static void PadRequest(const std::ustring &unpadded, std::ustring &padded);
 
-  static int Parse(
+  typedef struct ParseOutTag {
+    uint64_t midpoint;
+    uint64_t mintime;
+    uint64_t maxtime;
+    uint32_t radius;
+  } ParseOutT;
+
+  static uint64_t Parse(
     const uint8_t pubkey[32],
     const uint8_t nonce[64],
     const uint8_t b[],
-    const size_t b_length
+    const size_t b_length,
+    ParseOutT *const pOut = nullptr
   );
   
 private:

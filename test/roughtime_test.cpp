@@ -94,10 +94,15 @@ TEST(TestRt, RoughtimeParse) {
   const uint8_t pubkey[] = { 128, 62, 183, 133, 40, 247, 73, 196, 190, 194, 227, 158, 26, 187, 155, 94, 90, 183, 228, 221, 92, 228, 182, 242, 253, 47, 147, 236, 195, 83, 143, 26 };
   EXPECT_EQ(sizeof(pubkey), 32);
 
-  EXPECT_EQ(0 , RtClient::Parse(pubkey, nonce, answer, sizeof(answer)));
-
   const uint64_t midpoint = 1551958790167000;
   const uint64_t radius = 1000000;
+
+  RtClient::ParseOutT times;
+  EXPECT_EQ(midpoint, RtClient::Parse(pubkey, nonce, answer, sizeof(answer), &times));
+
+  EXPECT_EQ(times.radius, radius);
+  EXPECT_EQ(times.midpoint, midpoint);
+
 }
 
 TEST(TestRt, RoughtimeSend) {
@@ -150,8 +155,7 @@ TEST(TestRt, SendRequest){
   }
   
   DeleteUdpClient(&p);
-    
-  
+     
 }
 #endif
 
