@@ -119,29 +119,37 @@ static const uint8_t * subarray(
 static bool verify
  (
   const std::ustring &sigstr,
-  void *certificateContext,
+  const std::ustring &prefix,
   const std::ustring &bstring,
-  const int tagstart,
-  const int tagend,
+  const int start,
+  const int end,
   const std::ustring &pubkey
  )
 {
+  std::ustring signedStr;
+  subarray(bstring, start, end, signedStr);
+
   LOG_TRACE(("Signature length = %d\r\n", sigstr.length()));
   LOG_ASSERT_WARN(sigstr.length() == crypto_sign_ed25519_BYTES);
-  LOG_ASSERT_WARN(bstring.length() > tagend);
-  std::ustring signedStr;
-  subarray(bstring, tagstart, tagend, signedStr);
-  LOG_ASSERT_WARN((tagend - tagstart) == signedStr.length());
+  LOG_ASSERT_WARN(bstring.length() > end);
+  LOG_ASSERT_WARN((end - start) == signedStr.length());
   LOG_ASSERT_WARN(pubkey.length() == crypto_sign_PUBLICKEYBYTES);
 
+  std::ustring scratch1(prefix);
+  scratch1.append(signedStr);
+
   int noob = crypto_sign_verify_detached(
-    sigstr.data(), 
-    signedStr.data(), 
-    signedStr.length(), 
+    sigstr.data(),
+    scratch1.data(),
+    scratch1.length(),
     pubkey.data());
+
   return (0 == noob);
+
 }
 
+const char certificateContext[] = "RoughTime v1 delegation signature--";
+const char signedResponseContext[] = "RoughTime v1 response signature";
 
 // /////////////////////////////////////////////////////////////////////////////
 int RtClient::Parse(
@@ -441,11 +449,11 @@ int RtClient::Parse(
     subarray(bstring, CERT_SIG_tagstart, CERT_SIG_tagend, sigstr);
 
 #if 1
-    void *certificateContext = nullptr;
     std::ustring pubkeystr;
     pubkeystr.assign(pubkey, 32);
     std::ustring delegate;
-    if (!verify(sigstr, certificateContext, bstring, CERT_DELE_tagstart, CERT_DELE_tagend, pubkeystr))
+    std::ustring certificateContextStr((uint8_t *)certificateContext, strlen(certificateContext)+1);
+    if (!verify(sigstr, certificateContextStr, bstring, CERT_DELE_tagstart, CERT_DELE_tagend, pubkeystr))
     {
       return reject(b, "CERT.DELE does not verify");      
     }
