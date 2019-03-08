@@ -490,7 +490,11 @@ uint64_t RtClient::Parse(
   printf("\r\nhi\r\n");
 #endif 
 
-
+  // //////////////////////////////////////////////////////////////////////////
+  // HERE BE DRAGONS!
+  // This code is basically untested. It was lightly tested in the original
+  // javascript, and evel less tested here.
+  // //////////////////////////////////////////////////////////////////////////
   const auto pathlen = PATH_tagend - PATH_tagstart;
   if (pathlen > 0) {
     uint32_t index = uint32(b, INDX_tagstart);
@@ -532,6 +536,9 @@ uint64_t RtClient::Parse(
       index >>= 1;
     }
   }
+  // //////////////////////////////////////////////////////////////////////////
+  // END OF HERE BE DRAGONS!
+  // //////////////////////////////////////////////////////////////////////////
 
   {
     uint32_t i = 0;
