@@ -131,12 +131,6 @@ static bool verify
   std::ustring signedStr;
   subarray(bstring, start, end, signedStr);
 
-  LOG_TRACE(("Signature length = %d\r\n", sigstr.length()));
-  LOG_ASSERT_WARN(sigstr.length() == crypto_sign_ed25519_BYTES);
-  LOG_ASSERT_WARN(bstring.length() > end);
-  LOG_ASSERT_WARN((end - start) == signedStr.length());
-  LOG_ASSERT_WARN(pubkey.length() == crypto_sign_PUBLICKEYBYTES);
-
   std::ustring scratch1(prefix);
   scratch1.append(signedStr);
 
@@ -150,8 +144,9 @@ static bool verify
 
 }
 
-const char certificateContext[] = "RoughTime v1 delegation signature--";
-const char signedResponseContext[] = "RoughTime v1 response signature";
+// /////////////////////////////////////////////////////////////////////////////
+static const char certificateContext[] = "RoughTime v1 delegation signature--";
+static const char signedResponseContext[] = "RoughTime v1 response signature";
 
 // /////////////////////////////////////////////////////////////////////////////
 uint64_t RtClient::Parse(
@@ -498,7 +493,7 @@ uint64_t RtClient::Parse(
 
   const auto pathlen = PATH_tagend - PATH_tagstart;
   if (pathlen > 0) {
-    int32_t index = uint32(b, INDX_tagstart);
+    uint32_t index = uint32(b, INDX_tagstart);
 
     for (int j = 0; j < pathlen; j += 64) {
       std::ustring lStr;
