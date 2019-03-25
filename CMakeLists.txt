@@ -1,29 +1,10 @@
-##  Environment identifers
-# From: https://cmake.org/Wiki/CMake_Useful_Variables
-# UNIX
-#   is TRUE on all UNIX-like OS's, including Apple OS X and CygWin
-# WIN32
-#   is TRUE on Windows. Prior to 2.8.4 this included CygWin
-# APPLE
-#   is TRUE on Apple systems. Note this does not imply the system is Mac OS X,
-#   only that __APPLE__ is #defined in C/C++ header files. Obtain more specific
-#   system information via CMAKE_SYSTEM_VERSION,
-#   i.e. IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin"), then it's Mac OS X.
-# MINGW
-#   is TRUE when using the MinGW compiler in Windows
-# MSYS
-#   is TRUE when using the MSYS developer environment in Windows
-# CYGWIN
-#   is TRUE on Windows when using the CygWin version of cmake
-# MSVC, MSVC_IDE, MSVC60, MSVC70, MSVC71, MSVC80, CMAKE_COMPILER_2005, MSVC90, MSVC10 (Visual Studio 2010)
-#   Microsoft compiler
-
 cmake_minimum_required(VERSION 3.5)
 project(roughtime_cpp_test)
 
 set(CMAKE_CXX_STANDARD 11)
 
-add_definitions(-DSODIUM_STATIC -DDEBUG -D_CONSOLE)
+add_definitions(-DSODIUM_STATIC -DDEBUG -D_CONSOLE -DNATIVE_LITTLE_ENDIAN)
+#add_definitions(-DED25519_COMPAT)
 
 file(GLOB LOCAL_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
@@ -42,8 +23,22 @@ set(GTEST_SRC
 )
 
 
+file(GLOB_RECURSE LIBSODIUM_CRYPTO_SIGN_SRC
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_sign/*.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_sign/*.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_core/*.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_core/*.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_hash/*.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_hash/*.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_verify/*.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_verify/*.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/sodium/utils.c
+)
+
 set(SOURCE_FILES
         ${LOCAL_SRC}
+
+        ${LIBSODIUM_CRYPTO_SIGN_SRC}
 
         ${GTEST_SRC}
 )
@@ -60,6 +55,7 @@ include_directories(
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
+# target_link_libraries(${PROJECT_NAME} curl)
 if (WIN32)
     target_link_libraries(${PROJECT_NAME} ws2_32)
 else (WIN32)
