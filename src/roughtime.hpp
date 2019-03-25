@@ -1,12 +1,14 @@
-#pragma once
+#ifndef ROUGHTIME_HPP
+#define ROUGHTIME_HPP 1
 
+
+
+#include "platform/endian_convert.h"
+#include "utils/simple_string.hpp"
+#include <cstring>
 #include <cstdint>
-#include <string>
-#include "endian_convert.h"
 
-namespace std {
-typedef basic_string<uint8_t, char_traits<uint8_t>, allocator<uint8_t> > ustring;
-}
+#ifdef __cplusplus
 
 namespace roughtime {
   // These must be LE-ified
@@ -38,12 +40,22 @@ public:
   } RtHeaderT;
   
 public:
-  RtClient();
+
+  typedef void (*GenRandomFn)(void *p, uint8_t *buf, const size_t buflen);
+
+  RtClient(
+    GenRandomFn genRandom = nullptr,
+    void *genRandomData = nullptr
+  );
   ~RtClient();
   
-  void GenerateRequest(std::ustring &request);
-  
-  static void PadRequest(const std::ustring &unpadded, std::ustring &padded);
+  void GenerateRequest(
+    sstring &request,
+    const uint8_t *nonce = nullptr,
+    const size_t  nonceLen = 0
+  );
+
+  static void PadRequest(const sstring &unpadded, sstring &padded);
 
   typedef struct ParseOutTag {
     uint64_t midpoint;
@@ -63,6 +75,13 @@ public:
   const uint8_t *GetNonce();
 
 private:
+  GenRandomFn genRandom;
+  void * const genRandomData;
   uint8_t nonce[64];
   uint64_t ts_request;
+
+
 };
+
+#endif // #ifdef __cplusplus
+#endif

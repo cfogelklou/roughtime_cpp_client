@@ -1,29 +1,18 @@
-
 #include "roughtime.hpp"
 #include "crypto_sign.h"
-#include <string>
-#include <chrono>
+#include "utils/ble_log.h"
+#include "utils/helper_macros.h"
 
-#include <assert.h>
-#define LOG_TRACE(x) std::printf x
-#define LOG_WARNING(x) std::printf x
-#define LOG_ASSERT_WARN(state) if (!(state)) \
-do { LOG_WARNING(("Assertion Failed at %s(%d)\r\n", __FILE__, __LINE__)); } while(0)
-
-#ifndef MIN
-#define MIN(x,y) (((x) < (y)) ? (x) : (y))
-#endif
-
-// ////////////////////////////////////////////////////////////////////////////
-static uint64_t rt_seconds_since_epoch() {
-  auto now = std::chrono::duration_cast<std::chrono::milliseconds>
-    (std::chrono::system_clock::now().time_since_epoch()).count();
-  return (uint64_t)now;
-}
+LOG_MODNAME("roughtime.cpp");
 
 // /////////////////////////////////////////////////////////////////////////////
-RtClient::RtClient()
-: nonce()
+RtClient::RtClient(
+  GenRandomFn genRandom,
+  void *genRandomData
+)
+: genRandom(genRandom)
+, genRandomData(genRandomData)
+, nonce()
 , ts_request(0)
 {
 }
@@ -45,37 +34,47 @@ typedef union RtRequestTag {
 } RtRequestT;
 
 // /////////////////////////////////////////////////////////////////////////////
-void RtClient::GenerateRequest(std::ustring &request){
-  uint64_t ts = rt_seconds_since_epoch();
+void RtClient::GenerateRequest(
+  sstring &request,
+  const uint8_t *pNonce ,
+  const size_t  nonceLen
+  ){
   
+  memset(nonce, 0, sizeof(nonce));
+  if (pNonce && (nonceLen > 0)) {
+    const size_t len = MIN(nonceLen, sizeof(this->nonce));
+    memcpy(nonce, pNonce, len);
+  }
+  else if (genRandom) {
+    genRandom(genRandomData, nonce, sizeof(nonce));
+  }
+
   RtRequestT req;
   req.req.num_tags_le = HOSTTOLE32(2);
   req.req.offset1_le = HOSTTOLE32(64); // Padding starts at offset 64
   req.req.nonce_le = HOSTTOLE32(roughtime::NONC);
   req.req.pad_le = HOSTTOLE32(roughtime::PAD);
-  memset(nonce, 0, sizeof(nonce));
-  memcpy(nonce, &ts, sizeof(ts));
   memcpy(req.req.nonce, nonce, sizeof(nonce));
   request.assign(req.u, sizeof(req));
 }
 
 // /////////////////////////////////////////////////////////////////////////////
 void RtClient::PadRequest(
-  const std::ustring &unpadded,
-  std::ustring &padded)
+  const sstring &unpadded,
+  sstring &padded)
 {
   if (((void *)&unpadded) != ((void *)&padded)){
     padded.clear();
-    padded.insert(0, unpadded.data(), sizeof(RtRequestT));
+    padded.assign(unpadded.u_str(), sizeof(RtRequestT));
   }
   else {
-    std::ustring tmp = unpadded;
+    sstring tmp = unpadded;
     padded.clear();
-    padded.insert(0, tmp.data(), sizeof(RtRequestT));
+    padded.assign(tmp.u_str(), sizeof(RtRequestT));
   }
   uint8_t effeff[1024-sizeof(RtRequestT)];
   memset(effeff, 0xff, sizeof(effeff));
-  padded.insert(sizeof(RtRequestT), effeff, sizeof(effeff));
+  padded.append(effeff, sizeof(effeff));
 
 }
 
@@ -100,45 +99,45 @@ static uint64_t uint64(const uint8_t b[], const int i) {
 
 // /////////////////////////////////////////////////////////////////////////////
 static const uint8_t * subarray(
-  const std::ustring &bstr,
+  const sstring &bstr,
   const size_t fromIdx,
   const size_t toIdx, // up to AND INCLUDING
-  std::ustring &out) {
-  const size_t end = MIN(toIdx, (bstr.size() - 1));
+  sstring &out) {
+  const size_t end = MIN(toIdx, (bstr.length() - 1));
   const size_t beg = MIN(end, fromIdx);
   const int len = end - beg;
-  assert(len >= 0);
+  LOG_ASSERT(len >= 0);
   out.clear();
-  const uint8_t * const b = bstr.data();
+  const uint8_t * const b = bstr.u_str();
   out.assign(&b[beg], len);
 
   LOG_ASSERT_WARN(out.length() == (toIdx - fromIdx));
-  return out.data();
+  return out.u_str();
 }
 
 
 // /////////////////////////////////////////////////////////////////////////////
 static bool verify
  (
-  const std::ustring &sigstr,
-  const std::ustring &prefix,
-  const std::ustring &bstring,
+  const sstring &sigstr,
+  const sstring &prefix,
+  const sstring &bstring,
   const int start,
   const int end,
-  const std::ustring &pubkey
+  const sstring &pubkey
  )
 {
-  std::ustring signedStr;
+  sstring signedStr;
   subarray(bstring, start, end, signedStr);
 
-  std::ustring scratch1(prefix);
+  sstring scratch1(prefix);
   scratch1.append(signedStr);
 
   int noob = crypto_sign_verify_detached(
-    sigstr.data(),
-    scratch1.data(),
+    sigstr.u_str(),
+    scratch1.u_str(),
     scratch1.length(),
-    pubkey.data());
+    pubkey.u_str());
 
   return (0 == noob);
 
@@ -161,7 +160,7 @@ uint64_t RtClient::Parse(
   const size_t b_length,
   ParseOutT * const pOut
 ) {
-  std::ustring bstring;
+  sstring bstring;
   bstring.assign(b, b_length);
 
   int CERT_tagstart = -1;
@@ -448,28 +447,26 @@ uint64_t RtClient::Parse(
   } // for (;;)
 
   {
-    std::ustring sigstr;
+    sstring sigstr;
     subarray(bstring, CERT_SIG_tagstart, CERT_SIG_tagend, sigstr);
 
-    std::ustring pubkeystr;
+    sstring pubkeystr;
     pubkeystr.assign(pubkey, 32);
-    std::ustring delegate;
-    std::ustring certificateContextStr((uint8_t *)certificateContext, strlen(certificateContext) + 1);
-    if (!verify(sigstr, certificateContextStr, bstring, CERT_DELE_tagstart, CERT_DELE_tagend, pubkeystr))
-    {
+    sstring delegate;
+    sstring certificateContextStr((uint8_t *)certificateContext, strlen(certificateContext) + 1);
+    if (!verify(sigstr, certificateContextStr, bstring, CERT_DELE_tagstart, CERT_DELE_tagend, pubkeystr)) {
       return reject(b, "CERT.DELE does not verify");
     }
-
   }
 
   {
-    std::ustring sigstr;
+    sstring sigstr;
     subarray(bstring, SIG_tagstart, SIG_tagend, sigstr);
 
-    std::ustring pubkeystr;
+    sstring pubkeystr;
     subarray(bstring, CERT_DELE_PUBK_tagstart, CERT_DELE_PUBK_tagend, pubkeystr);
 
-    std::ustring signedResponseContextStr((uint8_t *)signedResponseContext, strlen(signedResponseContext) + 1);
+    sstring signedResponseContextStr((uint8_t *)signedResponseContext, strlen(signedResponseContext) + 1);
     if (!verify(sigstr, signedResponseContextStr, bstring, SREP_tagstart, SREP_tagend, pubkeystr)) {
       return reject(b, "SREP does not verify");
     }
@@ -505,9 +502,9 @@ uint64_t RtClient::Parse(
     uint32_t index = uint32(b, INDX_tagstart);
 
     for (int j = 0; j < pathlen; j += 64) {
-      std::ustring lStr;
+      sstring lStr;
       subarray(bstring, PATH_tagstart + j, PATH_tagstart + j + 64, lStr);
-      const uint8_t *l = lStr.data();
+      const uint8_t *l = lStr.u_str();
 
       //let r = h
       const uint8_t *r = h;
