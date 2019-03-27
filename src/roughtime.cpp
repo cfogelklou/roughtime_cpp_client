@@ -80,6 +80,8 @@ void RtClient::PadRequest(
 
 // /////////////////////////////////////////////////////////////////////////////
 static int reject(const uint8_t b[], const char *message) {
+  (void)b;
+  LOG_WARNING(("roughtime::rejected due to %s\r\n", message));
   return -1;
 }
 
