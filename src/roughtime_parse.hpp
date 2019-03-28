@@ -1,24 +1,14 @@
-#ifndef ROUGHTIME_HPP
-#define ROUGHTIME_HPP 1
-
+#ifndef ROUGHTIME_PARSE_HPP
+#define ROUGHTIME_PARSE_HPP 1
 
 #include <string>
 #include <cstdint>
-
 
 #ifdef __cplusplus
 
 #include "roughtime_common.hpp"
 
 namespace roughtime {
-  
-  // Do not use this struct directly; it is only here for documentation
-  // purposes.
-  typedef struct RtHeaderTag {
-    uint32_t num_tags_le;
-    uint32_t offets[1]; // offsets[MAX(0, num_tags-1)]
-    uint32_t tags[1];   // tags[num_tags]
-  } RtHeaderT;
   
 
   typedef struct ParseOutTag {
@@ -28,7 +18,7 @@ namespace roughtime {
     uint32_t radius;
   } ParseOutT;
 
-  uint64_t Parse(
+  uint64_t ParseToMicroseconds(
     const uint8_t pubkey[32],
     const uint8_t nonce[64],
     const uint8_t b[],

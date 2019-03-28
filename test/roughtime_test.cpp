@@ -24,14 +24,18 @@ TEST(TestCurl, curl_1) {
 }
 #endif
 
-TEST(TestRt, Constructor){
-  RtClient rt;
+
+static void stupidRandom(uint8_t *buf, int cnt) {
+  for (int i = 0; i < cnt; i++) {
+    buf[i] = rand() % 255;
+  }
 }
 
 TEST(TestRt, UnpaddedRequest){
-  RtClient rt;
   sstring req;
-  rt.GenerateRequest(req);
+  uint8_t nonce[64];
+  stupidRandom(nonce, sizeof(nonce));
+  roughtime::GenerateRequest(req, nonce, sizeof(nonce));
   ASSERT_EQ(req.length(), 80);
   const uint8_t *pr = req.data();
   EXPECT_EQ(pr[0], 2); // 2 tags
@@ -54,11 +58,12 @@ TEST(TestRt, UnpaddedRequest){
 }
 
 TEST(TestRt, PaddedRequest){
-  RtClient rt;
   sstring req;
-  rt.GenerateRequest(req);
+  uint8_t nonce[64];
+  stupidRandom(nonce, sizeof(nonce));
+  roughtime::GenerateRequest(req, nonce, sizeof(nonce));
   ASSERT_EQ(req.length(), 80);
-  rt.PadRequest(req, req);
+  roughtime::PadRequest(req, req);
   ASSERT_EQ(req.length(), 1024);
   const uint8_t *pr = req.data();
   EXPECT_EQ(pr[0], 2); // 2 tags
@@ -99,7 +104,7 @@ TEST(TestRt, RoughtimeParse) {
   const uint64_t radius = 1000000;
 
   roughtime::ParseOutT times;
-  EXPECT_EQ(midpoint, roughtime::Parse(pubkey, nonce, answer, sizeof(answer), &times));
+  EXPECT_EQ(midpoint, roughtime::ParseToMicroseconds(pubkey, nonce, answer, sizeof(answer), &times));
 
   EXPECT_EQ(times.radius, radius);
   EXPECT_EQ(times.midpoint, midpoint);
@@ -118,11 +123,12 @@ TEST(TestRt, RoughtimeSend) {
 #include "mini_socket.hpp"
 
 TEST(TestRt, SendRequest){
-  RtClient rt;
   sstring req;
-  rt.GenerateRequest(req);
+  uint8_t nonce[64];
+  stupidRandom(nonce, sizeof(nonce));
+  roughtime::GenerateRequest(req, nonce, sizeof(nonce));
   ASSERT_EQ(req.length(), 80);
-  rt.PadRequest(req, req);
+  roughtime::PadRequest(req, req);
   ASSERT_EQ(req.length(), 1024);
   const uint8_t *pr = req.data();
   EXPECT_EQ(pr[0], 2); // 2 tags
@@ -163,7 +169,7 @@ TEST(TestRt, SendRequest){
     const uint8_t pubkey[] = { 128, 62, 183, 133, 40, 247, 73, 196, 190, 194, 227, 158, 26, 187, 155, 94, 90, 183, 228, 221, 92, 228, 182, 242, 253, 47, 147, 236, 195, 83, 143, 26 };
     roughtime::ParseOutT times;
     
-    uint64_t midpoint = roughtime::Parse(pubkey, rt.GetNonce(), buf, amtRead, &times);
+    uint64_t midpoint = roughtime::ParseToMicroseconds(pubkey, nonce, buf, amtRead, &times);
     midpoint /= (1000ull*1000ull);
 
     std::time_t now = std::time(0);

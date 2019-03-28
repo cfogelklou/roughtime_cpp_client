@@ -3,23 +3,10 @@
 #include "roughtime_private.hpp"
 #include "crypto_sign.h"
 
-void stupidRandom(uint8_t *buf, int cnt) {
+static void stupidRandom(uint8_t *buf, int cnt) {
   for (int i = 0; i < cnt; i++) {
     buf[i] = rand() % 255;
   }
-}
-
-// /////////////////////////////////////////////////////////////////////////////
-RtClient::RtClient(
-)
-  : nonce()
-  , ts_request(0)
-{
-}
-
-// /////////////////////////////////////////////////////////////////////////////
-RtClient::~RtClient() {
-
 }
 
 typedef union RtRequestTag {
@@ -34,15 +21,15 @@ typedef union RtRequestTag {
 } RtRequestT;
 
 // /////////////////////////////////////////////////////////////////////////////
-void RtClient::GenerateRequest(
+void roughtime::GenerateRequest(
   sstring &request,
   const uint8_t *pNonce,
   const size_t  nonceLen
 ) {
+  uint8_t nonce[64] = { 0 };
 
-  memset(nonce, 0, sizeof(nonce));
   if (pNonce && (nonceLen > 0)) {
-    const size_t len = MIN(nonceLen, sizeof(this->nonce));
+    const size_t len = MIN(nonceLen, sizeof(nonce));
     memcpy(nonce, pNonce, len);
   }
   else {
@@ -59,7 +46,7 @@ void RtClient::GenerateRequest(
 }
 
 // /////////////////////////////////////////////////////////////////////////////
-void RtClient::PadRequest(
+void roughtime::PadRequest(
   const sstring &unpadded,
   sstring &padded)
 {
@@ -143,9 +130,4 @@ static bool verify
 
   return (0 == noob);
 
-}
-
-// /////////////////////////////////////////////////////////////////////////////
-const uint8_t *RtClient::GetNonce() {
-  return nonce;
 }

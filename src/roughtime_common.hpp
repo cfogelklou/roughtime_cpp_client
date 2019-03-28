@@ -25,6 +25,14 @@ namespace roughtime {
   static const uint32_t ROOT = 0x544f4f52;
   static const uint32_t SIG = 0x00474953;
   static const uint32_t SREP = 0x50455253;
+
+  // Do not use this struct directly; it is only here for documentation
+  // purposes.
+  typedef struct RtHeaderTag {
+    uint32_t num_tags_le;
+    uint32_t offets[1]; // offsets[MAX(0, num_tags-1)]
+    uint32_t tags[1];   // tags[num_tags]
+  } RtHeaderT;
 }
 
 #endif
