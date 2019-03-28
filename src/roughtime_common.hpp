@@ -4,7 +4,7 @@
 #ifdef __cplusplus
 #include <string>
 #ifdef __POLESTAR_PAK
-#include "utils/simple_string.h
+#include "utils/simple_string.hpp"
 #else
 typedef std::basic_string<uint8_t, std::char_traits<uint8_t>, std::allocator<uint8_t> > sstring;
 #endif
