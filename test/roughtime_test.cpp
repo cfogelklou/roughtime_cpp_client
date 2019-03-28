@@ -29,7 +29,7 @@ TEST(TestRt, Constructor){
 
 TEST(TestRt, UnpaddedRequest){
   RtClient rt;
-  std::ustring req;
+  sstring req;
   rt.GenerateRequest(req);
   ASSERT_EQ(req.length(), 80);
   const uint8_t *pr = req.data();
@@ -54,7 +54,7 @@ TEST(TestRt, UnpaddedRequest){
 
 TEST(TestRt, PaddedRequest){
   RtClient rt;
-  std::ustring req;
+  sstring req;
   rt.GenerateRequest(req);
   ASSERT_EQ(req.length(), 80);
   rt.PadRequest(req, req);
@@ -118,7 +118,7 @@ TEST(TestRt, RoughtimeSend) {
 
 TEST(TestRt, SendRequest){
   RtClient rt;
-  std::ustring req;
+  sstring req;
   rt.GenerateRequest(req);
   ASSERT_EQ(req.length(), 80);
   rt.PadRequest(req, req);

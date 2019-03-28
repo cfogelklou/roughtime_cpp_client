@@ -2,13 +2,17 @@
 #define ROUGHTIME_HPP 1
 
 
-
-#include "platform/endian_convert.h"
-#include "utils/simple_string.hpp"
-#include <cstring>
+#include <string>
 #include <cstdint>
 
+
 #ifdef __cplusplus
+
+#ifdef __POLESTAR_PAK
+#include "utils/simple_string.h
+#else
+typedef std::basic_string<uint8_t, std::char_traits<uint8_t>, std::allocator<uint8_t> > sstring;
+#endif
 
 namespace roughtime {
   // These must be LE-ified
