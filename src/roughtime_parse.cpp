@@ -87,7 +87,7 @@ static const char certificateContext[] = "RoughTime v1 delegation signature--";
 static const char signedResponseContext[] = "RoughTime v1 response signature";
 
 // /////////////////////////////////////////////////////////////////////////////
-uint64_t RtParse::Parse(
+uint64_t roughtime::Parse(
   const uint8_t pubkey[32],
   const uint8_t nonce[64],
   const uint8_t b[],
