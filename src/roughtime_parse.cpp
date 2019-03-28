@@ -1,37 +1,7 @@
-#include "roughtime.hpp"
+#include "roughtime_parse.hpp"
 #include "crypto_sign.h"
-#ifdef __POLESTAR_PAK
-#include "utils/ble_log.h"
-#include "utils/helper_macros.h"
-#include "platform/endian_convert.h"
+#include "roughtime_private.hpp"
 
-LOG_MODNAME("roughtime.cpp");
-#else
-#include <assert.h>
-#include "endian_convert.h"
-#define u_str() data()
-#define MIN(x,y) (((x) < (y)) ? (x) : (y))
-#define LOG_WARNING(x) printf x
-#define LOG_ASSERT assert
-#define LOG_ASSERT_WARN(x) if (!(x)) do { printf("Warning at %s (%d)\r\n", __FILE__, __LINE__);} while(0)
-#endif
-
-// /////////////////////////////////////////////////////////////////////////////
-RtClient::RtClient(
-  GenRandomFn genRandom,
-  void *genRandomData
-)
-: genRandom(genRandom)
-, genRandomData(genRandomData)
-, nonce()
-, ts_request(0)
-{
-}
-
-// /////////////////////////////////////////////////////////////////////////////
-RtClient::~RtClient(){
-  
-}
 
 typedef union RtRequestTag {
   struct {
@@ -44,50 +14,6 @@ typedef union RtRequestTag {
   uint8_t u[80];
 } RtRequestT;
 
-// /////////////////////////////////////////////////////////////////////////////
-void RtClient::GenerateRequest(
-  sstring &request,
-  const uint8_t *pNonce ,
-  const size_t  nonceLen
-  ){
-  
-  memset(nonce, 0, sizeof(nonce));
-  if (pNonce && (nonceLen > 0)) {
-    const size_t len = MIN(nonceLen, sizeof(this->nonce));
-    memcpy(nonce, pNonce, len);
-  }
-  else if (genRandom) {
-    genRandom(genRandomData, nonce, sizeof(nonce));
-  }
-
-  RtRequestT req;
-  req.req.num_tags_le = HOSTTOLE32(2);
-  req.req.offset1_le = HOSTTOLE32(64); // Padding starts at offset 64
-  req.req.nonce_le = HOSTTOLE32(roughtime::NONC);
-  req.req.pad_le = HOSTTOLE32(roughtime::PAD);
-  memcpy(req.req.nonce, nonce, sizeof(nonce));
-  request.assign(req.u, sizeof(req));
-}
-
-// /////////////////////////////////////////////////////////////////////////////
-void RtClient::PadRequest(
-  const sstring &unpadded,
-  sstring &padded)
-{
-  if (((void *)&unpadded) != ((void *)&padded)){
-    padded.clear();
-    padded.assign(unpadded.u_str(), sizeof(RtRequestT));
-  }
-  else {
-    sstring tmp = unpadded;
-    padded.clear();
-    padded.assign(tmp.u_str(), sizeof(RtRequestT));
-  }
-  uint8_t effeff[1024-sizeof(RtRequestT)];
-  memset(effeff, 0xff, sizeof(effeff));
-  padded.append(effeff, sizeof(effeff));
-
-}
 
 // /////////////////////////////////////////////////////////////////////////////
 static int reject(const uint8_t b[], const char *message) {
@@ -157,16 +83,11 @@ static bool verify
 }
 
 // /////////////////////////////////////////////////////////////////////////////
-const uint8_t *RtClient::GetNonce() {
-  return nonce;
-}
-
-// /////////////////////////////////////////////////////////////////////////////
 static const char certificateContext[] = "RoughTime v1 delegation signature--";
 static const char signedResponseContext[] = "RoughTime v1 response signature";
 
 // /////////////////////////////////////////////////////////////////////////////
-uint64_t RtClient::Parse(
+uint64_t RtParse::Parse(
   const uint8_t pubkey[32],
   const uint8_t nonce[64],
   const uint8_t b[],
