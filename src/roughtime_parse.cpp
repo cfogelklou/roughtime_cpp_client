@@ -16,14 +16,14 @@ typedef union RtRequestTag {
 
 
 // /////////////////////////////////////////////////////////////////////////////
-static int reject(const uint8_t b[], const char *message) {
+static int rp_reject(const uint8_t b[], const char *message) {
   (void)b;
   LOG_WARNING(("roughtime::rejected due to %s\r\n", message));
   return -1;
 }
 
 // /////////////////////////////////////////////////////////////////////////////
-static uint32_t uint32(const uint8_t b[], const int i) {
+static uint32_t rp_get_uint32_at(const uint8_t b[], const int i) {
   uint32_t tmp;
   memcpy(&tmp, &b[i], sizeof(tmp));
   return LE32TOHOST(tmp);
@@ -129,20 +129,20 @@ uint64_t roughtime::ParseToMicroseconds(
   int n = b_length;
 
   if (n % 4 > 0) {
-    return reject(b, "short message");
+    return rp_reject(b, "short message");
   }
 
   bool done = false;
   while (!done) {
     if (i + 4 > n) {
-      return reject(b, "short message");
+      return rp_reject(b, "short message");
     }
 
-    const uint32_t ntags = uint32(b, i);
+    const uint32_t ntags = rp_get_uint32_at(b, i);
     i += 4;
 
     if (ntags == 0) {
-      return reject(b, "no tags"); // not technically illegal but...
+      return rp_reject(b, "no tags"); // not technically illegal but...
     }
 
     const int firstoffset = i;
@@ -156,23 +156,23 @@ uint64_t roughtime::ParseToMicroseconds(
     const int firstdatabyte = i;
 
     if (i > n) {
-      return reject(b, "short message");
+      return rp_reject(b, "short message");
     }
 
     for (int last = -1, j = firstoffset; j < lastoffset; j += 4) {
-      const int32_t offset = uint32(b, j);
+      const int32_t offset = rp_get_uint32_at(b, j);
 
       if (offset < last) {
-        return reject(b, "illegal offset (order)");
+        return rp_reject(b, "illegal offset (order)");
       }
       last = offset;
 
       if (offset % 4 > 0) {
-        return reject(b, "illegal offset (alignment)");
+        return rp_reject(b, "illegal offset (alignment)");
       }
 
       if (offset + firstdatabyte > n) {
-        return reject(b, "illegal offset (range)");
+        return rp_reject(b, "illegal offset (range)");
       }
     }
 
@@ -183,10 +183,10 @@ uint64_t roughtime::ParseToMicroseconds(
       tagend = n;
 
       if (j + 4 < lasttag) {
-        tagend = firstdatabyte + uint32(b, j - firsttag + firstoffset);
+        tagend = firstdatabyte + rp_get_uint32_at(b, j - firsttag + firstoffset);
       }
 
-      const uint32_t tag = uint32(b, j);
+      const uint32_t tag = rp_get_uint32_at(b, j);
 
       switch (s) {
       case 0: // toplevel
@@ -266,35 +266,35 @@ uint64_t roughtime::ParseToMicroseconds(
     switch (s) {
     case 0: // toplevel
       if (CERT_tagstart < 0) {
-        return reject(b, "no CERT tag");
+        return rp_reject(b, "no CERT tag");
       }
 
       if (INDX_tagstart < 0) {
-        return reject(b, "no INDX tag");
+        return rp_reject(b, "no INDX tag");
       }
 
       if (INDX_tagend - INDX_tagstart != 4) {
-        return reject(b, "bad INDX tag");
+        return rp_reject(b, "bad INDX tag");
       }
 
       if (PATH_tagstart < 0) {
-        return reject(b, "no PATH tag");
+        return rp_reject(b, "no PATH tag");
       }
 
       if ((PATH_tagend - PATH_tagstart) % 64 != 0) {
-        return reject(b, "bad PATH tag");
+        return rp_reject(b, "bad PATH tag");
       }
 
       if (SIG_tagstart < 0) {
-        return reject(b, "no SIG tag");
+        return rp_reject(b, "no SIG tag");
       }
 
       if (SIG_tagend - SIG_tagstart != 64) {
-        return reject(b, "bad SIG tag");
+        return rp_reject(b, "bad SIG tag");
       }
 
       if (SREP_tagstart < 0) {
-        return reject(b, "no SREP tag");
+        return rp_reject(b, "no SREP tag");
       }
 
       i = CERT_tagstart;
@@ -304,15 +304,15 @@ uint64_t roughtime::ParseToMicroseconds(
 
     case 1: // CERT
       if (CERT_DELE_tagstart < 0) {
-        return reject(b, "no CERT.DELE tag");
+        return rp_reject(b, "no CERT.DELE tag");
       }
 
       if (CERT_SIG_tagstart < 0) {
-        return reject(b, "no CERT.SIG tag");
+        return rp_reject(b, "no CERT.SIG tag");
       }
 
       if (CERT_SIG_tagend - CERT_SIG_tagstart != 64) {
-        return reject(b, "bad CERT.SIG tag");
+        return rp_reject(b, "bad CERT.SIG tag");
       }
 
       i = CERT_DELE_tagstart;
@@ -322,27 +322,27 @@ uint64_t roughtime::ParseToMicroseconds(
 
     case 2: // CERT_DELE
       if (CERT_DELE_MAXT_tagstart < 0) {
-        return reject(b, "no CERT.DELE.MAXT tag");
+        return rp_reject(b, "no CERT.DELE.MAXT tag");
       }
 
       if (CERT_DELE_MAXT_tagend - CERT_DELE_MAXT_tagstart != 8) {
-        return reject(b, "bad CERT.DELE.MAXT tag");
+        return rp_reject(b, "bad CERT.DELE.MAXT tag");
       }
 
       if (CERT_DELE_MINT_tagstart < 0) {
-        return reject(b, "no CERT.DELE.MINT tag");
+        return rp_reject(b, "no CERT.DELE.MINT tag");
       }
 
       if (CERT_DELE_MINT_tagend - CERT_DELE_MINT_tagstart != 8) {
-        return reject(b, "bad CERT.DELE.MAXT tag");
+        return rp_reject(b, "bad CERT.DELE.MAXT tag");
       }
 
       if (CERT_DELE_PUBK_tagstart < 0) {
-        return reject(b, "no CERT.DELE.PUBK tag");
+        return rp_reject(b, "no CERT.DELE.PUBK tag");
       }
 
       if (CERT_DELE_PUBK_tagend - CERT_DELE_PUBK_tagstart != 32) {
-        return reject(b, "bad CERT.DELE.PUBK");
+        return rp_reject(b, "bad CERT.DELE.PUBK");
       }
 
       i = SREP_tagstart;
@@ -352,27 +352,27 @@ uint64_t roughtime::ParseToMicroseconds(
 
     case 3: // SREP
       if (SREP_MIDP_tagstart < 0) {
-        return reject(b, "no SREP.MIDP tag");
+        return rp_reject(b, "no SREP.MIDP tag");
       }
 
       if (SREP_MIDP_tagend - SREP_MIDP_tagstart != 8) {
-        return reject(b, "bad SREP.MIDP tag");
+        return rp_reject(b, "bad SREP.MIDP tag");
       }
 
       if (SREP_RADI_tagstart < 0) {
-        return reject(b, "no SREP.RADI tag");
+        return rp_reject(b, "no SREP.RADI tag");
       }
 
       if (SREP_RADI_tagend - SREP_RADI_tagstart != 4) {
-        return reject(b, "bad SREP.RADI tag");
+        return rp_reject(b, "bad SREP.RADI tag");
       }
 
       if (SREP_ROOT_tagstart < 0) {
-        return reject(b, "no SREP.ROOT tag");
+        return rp_reject(b, "no SREP.ROOT tag");
       }
 
       if (SREP_ROOT_tagend - SREP_ROOT_tagstart != 64) {
-        return reject(b, "bad SREP.ROOT tag");
+        return rp_reject(b, "bad SREP.ROOT tag");
       }
 
       done = true;
@@ -389,7 +389,7 @@ uint64_t roughtime::ParseToMicroseconds(
     sstring delegate;
     sstring certificateContextStr((uint8_t *)certificateContext, strlen(certificateContext) + 1);
     if (!verify(sigstr, certificateContextStr, bstring, CERT_DELE_tagstart, CERT_DELE_tagend, pubkeystr)) {
-      return reject(b, "CERT.DELE does not verify");
+      return rp_reject(b, "CERT.DELE does not verify");
     }
   }
 
@@ -402,7 +402,7 @@ uint64_t roughtime::ParseToMicroseconds(
 
     sstring signedResponseContextStr((uint8_t *)signedResponseContext, strlen(signedResponseContext) + 1);
     if (!verify(sigstr, signedResponseContextStr, bstring, SREP_tagstart, SREP_tagend, pubkeystr)) {
-      return reject(b, "SREP does not verify");
+      return rp_reject(b, "SREP does not verify");
     }
   }
 
@@ -433,7 +433,7 @@ uint64_t roughtime::ParseToMicroseconds(
   // //////////////////////////////////////////////////////////////////////////
   const auto pathlen = PATH_tagend - PATH_tagstart;
   if (pathlen > 0) {
-    uint32_t index = uint32(b, INDX_tagstart);
+    uint32_t index = rp_get_uint32_at(b, INDX_tagstart);
 
     for (int j = 0; j < pathlen; j += 64) {
       sstring lStr;
@@ -485,7 +485,7 @@ uint64_t roughtime::ParseToMicroseconds(
     }
 
     if (i != 0) {
-      return reject(b, "ROOT does not verify");
+      return rp_reject(b, "ROOT does not verify");
     }
   }
 
@@ -494,29 +494,29 @@ uint64_t roughtime::ParseToMicroseconds(
     // TODO(bnoordhuis) switch to BigInt before 2255 AD
   midpoint = uint64(b, SREP_MIDP_tagstart);
   if (midpoint > deepFuture)
-    return reject(b, "deep future midpoint");
+    return rp_reject(b, "deep future midpoint");
 
   mintime = uint64(b, CERT_DELE_MINT_tagstart);
   if (mintime > deepFuture)
-    return reject(b, "deep future mintime");
+    return rp_reject(b, "deep future mintime");
 
   maxtime = uint64(b, CERT_DELE_MAXT_tagstart);
   if (maxtime > deepFuture)
-    return reject(b, "deep future maxtime");
+    return rp_reject(b, "deep future maxtime");
 
   if (maxtime < mintime) {
-    return reject(b, "maxtime < mintime");
+    return rp_reject(b, "maxtime < mintime");
   }
 
   if (midpoint < mintime) {
-    return reject(b, "midpoint < mintime");
+    return rp_reject(b, "midpoint < mintime");
   }
 
   if (midpoint > maxtime) {
-    return reject(b, "midpoint > maxtime");
+    return rp_reject(b, "midpoint > maxtime");
   }
   
-  const uint32_t radius = uint32(b, SREP_RADI_tagstart);
+  const uint32_t radius = rp_get_uint32_at(b, SREP_RADI_tagstart);
 
   if (pOut) {
     pOut->maxtime = maxtime;
