@@ -30,19 +30,19 @@ static uint32_t rp_get_uint32_at(const uint8_t b[], const int i) {
 }
 
 // /////////////////////////////////////////////////////////////////////////////
-static uint64_t uint64(const uint8_t b[], const int i) {
+static uint64_t rp_get_uint64_at(const uint8_t b[], const int i) {
   uint64_t tmp;
   memcpy(&tmp, &b[i], sizeof(tmp));
   return LE64TOHOST(tmp);
 }
 
 // /////////////////////////////////////////////////////////////////////////////
-static const uint8_t * subarray(
+static const uint8_t * rp_subarray(
   const sstring &bstr,
   const size_t fromIdx,
   const size_t toIdx, // up to AND INCLUDING
   sstring &out) {
-  const size_t end = MIN(toIdx, (bstr.length() - 1));
+  const size_t end = MIN(((int)toIdx), ((int)(bstr.length() - 1)));
   const size_t beg = MIN(end, fromIdx);
   const int len = end - beg;
   LOG_ASSERT(len >= 0);
@@ -67,7 +67,7 @@ static bool verify
  )
 {
   sstring signedStr;
-  subarray(bstring, start, end, signedStr);
+  rp_subarray(bstring, start, end, signedStr);
 
   sstring scratch1(prefix);
   scratch1.append(signedStr);
@@ -382,7 +382,7 @@ uint64_t roughtime::ParseToMicroseconds(
 
   {
     sstring sigstr;
-    subarray(bstring, CERT_SIG_tagstart, CERT_SIG_tagend, sigstr);
+    rp_subarray(bstring, CERT_SIG_tagstart, CERT_SIG_tagend, sigstr);
 
     sstring pubkeystr;
     pubkeystr.assign(pubkey, 32);
@@ -395,10 +395,10 @@ uint64_t roughtime::ParseToMicroseconds(
 
   {
     sstring sigstr;
-    subarray(bstring, SIG_tagstart, SIG_tagend, sigstr);
+    rp_subarray(bstring, SIG_tagstart, SIG_tagend, sigstr);
 
     sstring pubkeystr;
-    subarray(bstring, CERT_DELE_PUBK_tagstart, CERT_DELE_PUBK_tagend, pubkeystr);
+    rp_subarray(bstring, CERT_DELE_PUBK_tagstart, CERT_DELE_PUBK_tagend, pubkeystr);
 
     sstring signedResponseContextStr((uint8_t *)signedResponseContext, strlen(signedResponseContext) + 1);
     if (!verify(sigstr, signedResponseContextStr, bstring, SREP_tagstart, SREP_tagend, pubkeystr)) {
@@ -437,7 +437,7 @@ uint64_t roughtime::ParseToMicroseconds(
 
     for (int j = 0; j < pathlen; j += 64) {
       sstring lStr;
-      subarray(bstring, PATH_tagstart + j, PATH_tagstart + j + 64, lStr);
+      rp_subarray(bstring, PATH_tagstart + j, PATH_tagstart + j + 64, lStr);
       const uint8_t *l = lStr.u_str();
 
       //let r = h
@@ -492,15 +492,15 @@ uint64_t roughtime::ParseToMicroseconds(
   uint64_t midpoint, mintime, maxtime;
   const uint64_t deepFuture = 2097152ull << 32ull;
     // TODO(bnoordhuis) switch to BigInt before 2255 AD
-  midpoint = uint64(b, SREP_MIDP_tagstart);
+  midpoint = rp_get_uint64_at(b, SREP_MIDP_tagstart);
   if (midpoint > deepFuture)
     return rp_reject(b, "deep future midpoint");
 
-  mintime = uint64(b, CERT_DELE_MINT_tagstart);
+  mintime = rp_get_uint64_at(b, CERT_DELE_MINT_tagstart);
   if (mintime > deepFuture)
     return rp_reject(b, "deep future mintime");
 
-  maxtime = uint64(b, CERT_DELE_MAXT_tagstart);
+  maxtime = rp_get_uint64_at(b, CERT_DELE_MAXT_tagstart);
   if (maxtime > deepFuture)
     return rp_reject(b, "deep future maxtime");
 
