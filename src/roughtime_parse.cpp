@@ -54,9 +54,8 @@ static const uint8_t * rp_subarray(
   return out.u_str();
 }
 
-
 // /////////////////////////////////////////////////////////////////////////////
-static bool verify
+static bool rp_verify
  (
   const sstring &sigstr,
   const sstring &prefix,
@@ -72,7 +71,7 @@ static bool verify
   sstring scratch1(prefix);
   scratch1.append(signedStr);
 
-  int noob = crypto_sign_verify_detached(
+  const int noob = crypto_sign_verify_detached(
     sigstr.u_str(),
     scratch1.u_str(),
     scratch1.length(),
@@ -83,8 +82,8 @@ static bool verify
 }
 
 // /////////////////////////////////////////////////////////////////////////////
-static const char certificateContext[] = "RoughTime v1 delegation signature--";
-static const char signedResponseContext[] = "RoughTime v1 response signature";
+static const char rp_CertificateContext[] = "RoughTime v1 delegation signature--";
+static const char rp_SignedResponseContext[] = "RoughTime v1 response signature";
 
 // /////////////////////////////////////////////////////////////////////////////
 uint64_t roughtime::ParseToMicroseconds(
@@ -387,8 +386,8 @@ uint64_t roughtime::ParseToMicroseconds(
     sstring pubkeystr;
     pubkeystr.assign(pubkey, 32);
     sstring delegate;
-    sstring certificateContextStr((uint8_t *)certificateContext, strlen(certificateContext) + 1);
-    if (!verify(sigstr, certificateContextStr, bstring, CERT_DELE_tagstart, CERT_DELE_tagend, pubkeystr)) {
+    sstring certificateContextStr((uint8_t *)rp_CertificateContext, strlen(rp_CertificateContext) + 1);
+    if (!rp_verify(sigstr, certificateContextStr, bstring, CERT_DELE_tagstart, CERT_DELE_tagend, pubkeystr)) {
       return rp_reject(b, "CERT.DELE does not verify");
     }
   }
@@ -400,8 +399,8 @@ uint64_t roughtime::ParseToMicroseconds(
     sstring pubkeystr;
     rp_subarray(bstring, CERT_DELE_PUBK_tagstart, CERT_DELE_PUBK_tagend, pubkeystr);
 
-    sstring signedResponseContextStr((uint8_t *)signedResponseContext, strlen(signedResponseContext) + 1);
-    if (!verify(sigstr, signedResponseContextStr, bstring, SREP_tagstart, SREP_tagend, pubkeystr)) {
+    sstring signedResponseContextStr((uint8_t *)rp_SignedResponseContext, strlen(rp_SignedResponseContext) + 1);
+    if (!rp_verify(sigstr, signedResponseContextStr, bstring, SREP_tagstart, SREP_tagend, pubkeystr)) {
       return rp_reject(b, "SREP does not verify");
     }
   }
