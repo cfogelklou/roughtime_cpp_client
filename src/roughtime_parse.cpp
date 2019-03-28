@@ -18,7 +18,7 @@ typedef union RtRequestTag {
 // /////////////////////////////////////////////////////////////////////////////
 static int rp_reject(const uint8_t b[], const char *message) {
   (void)b;
-  LOG_WARNING(("roughtime::rejected due to %s\r\n", message));
+  LOG_WARNING(("RoughTime::rejected due to %s\r\n", message));
   return -1;
 }
 
@@ -86,7 +86,7 @@ static const char rp_CertificateContext[] = "RoughTime v1 delegation signature--
 static const char rp_SignedResponseContext[] = "RoughTime v1 response signature";
 
 // /////////////////////////////////////////////////////////////////////////////
-uint64_t roughtime::ParseToMicroseconds(
+uint64_t RoughTime::ParseToMicroseconds(
   const uint8_t pubkey[32],
   const uint8_t nonce[64],
   const uint8_t b[],
@@ -190,23 +190,23 @@ uint64_t roughtime::ParseToMicroseconds(
       switch (s) {
       case 0: // toplevel
         switch (tag) {
-        case roughtime::CERT:
+        case RoughTime::CERT:
           CERT_tagstart = tagstart;
           CERT_tagend = tagend;
           break;
-        case roughtime::INDX:
+        case RoughTime::INDX:
           INDX_tagstart = tagstart;
           INDX_tagend = tagend;
           break;
-        case roughtime::PATH:
+        case RoughTime::PATH:
           PATH_tagstart = tagstart;
           PATH_tagend = tagend;
           break;
-        case roughtime::SIG:
+        case RoughTime::SIG:
           SIG_tagstart = tagstart;
           SIG_tagend = tagend;
           break;
-        case roughtime::SREP:
+        case RoughTime::SREP:
           SREP_tagstart = tagstart;
           SREP_tagend = tagend;
           break;
@@ -215,11 +215,11 @@ uint64_t roughtime::ParseToMicroseconds(
 
       case 1: // CERT
         switch (tag) {
-        case roughtime::DELE:
+        case RoughTime::DELE:
           CERT_DELE_tagstart = tagstart;
           CERT_DELE_tagend = tagend;
           break;
-        case roughtime::SIG:
+        case RoughTime::SIG:
           CERT_SIG_tagstart = tagstart;
           CERT_SIG_tagend = tagend;
           break;
@@ -228,15 +228,15 @@ uint64_t roughtime::ParseToMicroseconds(
 
       case 2: // CERT_DELE
         switch (tag) {
-        case roughtime::MAXT:
+        case RoughTime::MAXT:
           CERT_DELE_MAXT_tagstart = tagstart;
           CERT_DELE_MAXT_tagend = tagend;
           break;
-        case roughtime::MINT:
+        case RoughTime::MINT:
           CERT_DELE_MINT_tagstart = tagstart;
           CERT_DELE_MINT_tagend = tagend;
           break;
-        case roughtime::PUBK:
+        case RoughTime::PUBK:
           CERT_DELE_PUBK_tagstart = tagstart;
           CERT_DELE_PUBK_tagend = tagend;
           break;
@@ -245,15 +245,15 @@ uint64_t roughtime::ParseToMicroseconds(
 
       case 3: // SREP
         switch (tag) {
-        case roughtime::MIDP:
+        case RoughTime::MIDP:
           SREP_MIDP_tagstart = tagstart;
           SREP_MIDP_tagend = tagend;
           break;
-        case roughtime::RADI:
+        case RoughTime::RADI:
           SREP_RADI_tagstart = tagstart;
           SREP_RADI_tagend = tagend;
           break;
-        case roughtime::ROOT:
+        case RoughTime::ROOT:
           SREP_ROOT_tagstart = tagstart;
           SREP_ROOT_tagend = tagend;
           break;

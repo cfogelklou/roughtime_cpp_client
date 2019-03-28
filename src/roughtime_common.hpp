@@ -9,7 +9,7 @@
 typedef std::basic_string<uint8_t, std::char_traits<uint8_t>, std::allocator<uint8_t> > sstring;
 #endif
 
-namespace roughtime {
+namespace RoughTime {
   // These must be LE-ified
   static const uint32_t CERT = 0x54524543;
   static const uint32_t DELE = 0x454c4544;

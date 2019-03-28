@@ -21,7 +21,7 @@ typedef union RtRequestTag {
 } RtRequestT;
 
 // /////////////////////////////////////////////////////////////////////////////
-void roughtime::GenerateRequest(
+void RoughTime::GenerateRequest(
   sstring &request,
   const uint8_t *pNonce,
   const size_t  nonceLen
@@ -39,14 +39,14 @@ void roughtime::GenerateRequest(
   RtRequestT req;
   req.req.num_tags_le = HOSTTOLE32(2);
   req.req.offset1_le = HOSTTOLE32(64); // Padding starts at offset 64
-  req.req.nonce_le = HOSTTOLE32(roughtime::NONC);
-  req.req.pad_le = HOSTTOLE32(roughtime::PAD);
+  req.req.nonce_le = HOSTTOLE32(RoughTime::NONC);
+  req.req.pad_le = HOSTTOLE32(RoughTime::PAD);
   memcpy(req.req.nonce, nonce, sizeof(nonce));
   request.assign(req.u, sizeof(req));
 }
 
 // /////////////////////////////////////////////////////////////////////////////
-void roughtime::PadRequest(
+void RoughTime::PadRequest(
   const sstring &unpadded,
   sstring &padded)
 {
@@ -68,7 +68,7 @@ void roughtime::PadRequest(
 // /////////////////////////////////////////////////////////////////////////////
 static int reject(const uint8_t b[], const char *message) {
   (void)b;
-  LOG_WARNING(("roughtime::rejected due to %s\r\n", message));
+  LOG_WARNING(("RoughTime::rejected due to %s\r\n", message));
   return -1;
 }
 

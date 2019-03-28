@@ -4,8 +4,7 @@
 #ifdef __cplusplus
 #include "roughtime_common.hpp"
 
-namespace roughtime {
-
+namespace RoughTime {
 
   void GenerateRequest(
     sstring &request,

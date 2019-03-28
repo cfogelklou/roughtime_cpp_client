@@ -8,7 +8,7 @@
 
 #include "roughtime_common.hpp"
 
-namespace roughtime {
+namespace RoughTime {
   
 
   typedef struct ParseOutTag {
