@@ -18,7 +18,7 @@ typedef union RtRequestTag {
     uint8_t  nonce[64];
   } req;
   uint8_t u[80];
-} RtRequestT;
+} RpRequestT;
 
 // /////////////////////////////////////////////////////////////////////////////
 void RoughTime::GenerateRequest(
@@ -36,7 +36,7 @@ void RoughTime::GenerateRequest(
     stupidRandom(nonce, 64);
   }
 
-  RtRequestT req;
+  RpRequestT req;
   req.req.num_tags_le = HOSTTOLE32(2);
   req.req.offset1_le = HOSTTOLE32(64); // Padding starts at offset 64
   req.req.nonce_le = HOSTTOLE32(RoughTime::NONC);
@@ -52,82 +52,15 @@ void RoughTime::PadRequest(
 {
   if (((void *)&unpadded) != ((void *)&padded)) {
     padded.clear();
-    padded.assign(unpadded.u_str(), sizeof(RtRequestT));
+    padded.assign(unpadded.u_str(), sizeof(RpRequestT));
   }
   else {
     sstring tmp = unpadded;
     padded.clear();
-    padded.assign(tmp.u_str(), sizeof(RtRequestT));
+    padded.assign(tmp.u_str(), sizeof(RpRequestT));
   }
-  uint8_t effeff[1024 - sizeof(RtRequestT)];
+  uint8_t effeff[1024 - sizeof(RpRequestT)];
   memset(effeff, 0xff, sizeof(effeff));
   padded.append(effeff, sizeof(effeff));
-
-}
-
-// /////////////////////////////////////////////////////////////////////////////
-static int reject(const uint8_t b[], const char *message) {
-  (void)b;
-  LOG_WARNING(("RoughTime::rejected due to %s\r\n", message));
-  return -1;
-}
-
-// /////////////////////////////////////////////////////////////////////////////
-static uint32_t uint32(const uint8_t b[], const int i) {
-  uint32_t tmp;
-  memcpy(&tmp, &b[i], sizeof(tmp));
-  return LE32TOHOST(tmp);
-}
-
-// /////////////////////////////////////////////////////////////////////////////
-static uint64_t uint64(const uint8_t b[], const int i) {
-  uint64_t tmp;
-  memcpy(&tmp, &b[i], sizeof(tmp));
-  return LE64TOHOST(tmp);
-}
-
-// /////////////////////////////////////////////////////////////////////////////
-static const uint8_t * subarray(
-  const sstring &bstr,
-  const size_t fromIdx,
-  const size_t toIdx, // up to AND INCLUDING
-  sstring &out) {
-  const size_t end = MIN(toIdx, (bstr.length() - 1));
-  const size_t beg = MIN(end, fromIdx);
-  const int len = end - beg;
-  LOG_ASSERT(len >= 0);
-  out.clear();
-  const uint8_t * const b = bstr.u_str();
-  out.assign(&b[beg], len);
-
-  LOG_ASSERT_WARN(out.length() == (toIdx - fromIdx));
-  return out.u_str();
-}
-
-
-// /////////////////////////////////////////////////////////////////////////////
-static bool verify
-(
-  const sstring &sigstr,
-  const sstring &prefix,
-  const sstring &bstring,
-  const int start,
-  const int end,
-  const sstring &pubkey
-)
-{
-  sstring signedStr;
-  subarray(bstring, start, end, signedStr);
-
-  sstring scratch1(prefix);
-  scratch1.append(signedStr);
-
-  int noob = crypto_sign_verify_detached(
-    sigstr.u_str(),
-    scratch1.u_str(),
-    scratch1.length(),
-    pubkey.u_str());
-
-  return (0 == noob);
 
 }

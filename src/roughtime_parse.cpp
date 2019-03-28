@@ -3,18 +3,6 @@
 #include "roughtime_private.hpp"
 
 
-typedef union RtRequestTag {
-  struct {
-    uint32_t num_tags_le;
-    uint32_t offset1_le;
-    uint32_t nonce_le;
-    uint32_t pad_le;
-    uint8_t  nonce[64];
-  } req;
-  uint8_t u[80];
-} RtRequestT;
-
-
 // /////////////////////////////////////////////////////////////////////////////
 static int rp_reject(const uint8_t b[], const char *message) {
   (void)b;
@@ -415,15 +403,6 @@ uint64_t RoughTime::ParseToMicroseconds(
     crypto_hash_sha512_update(&sha, nonce, 64);
     crypto_hash_sha512_final(&sha, h);
   }
-#if 0
-  for (int i = 0; i < sizeof(h); i += 8) {
-    printf("%d, %d, %d, %d, %d, %d, %d, %d, \r\n"
-      , h[i + 0], h[i + 1], h[i + 2], h[i + 3]
-      , h[i + 4], h[i + 5], h[i + 6], h[i + 7]
-    );
-  }
-  printf("\r\nhi\r\n");
-#endif 
 
   // //////////////////////////////////////////////////////////////////////////
   // HERE BE DRAGONS!
@@ -460,14 +439,6 @@ uint64_t RoughTime::ParseToMicroseconds(
         crypto_hash_sha512_final(&sha, h);
       }
 
-#if 0
-      for (int i = 0; i < sizeof(h); i += 8) {
-        printf("%d, %d, %d, %d, %d, %d, %d, %d, \r\n"
-          , h[i + 0], h[i + 1], h[i + 2], h[i + 3]
-          , h[i + 4], h[i + 5], h[i + 6], h[i + 7]
-        );
-      }
-#endif 
       index >>= 1;
     }
   }
@@ -478,6 +449,7 @@ uint64_t RoughTime::ParseToMicroseconds(
   {
     uint32_t i = 0;
 
+    LOG_ASSERT((64 + SREP_ROOT_tagstart) < ((int)b_length));
     for (int j = 0; j < 64; j++) {
       i ^= h[j];
       i ^= b[j + SREP_ROOT_tagstart];
