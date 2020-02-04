@@ -55,6 +55,6 @@ jobs:
       if: (github.workflow != 'CD')
       run: |
         pushd build
-        ctest -j4
+        ctest -j4 --verbose
         popd        
   
