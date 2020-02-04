@@ -3,7 +3,8 @@ project(roughtime_cpp_test)
 
 set(CMAKE_CXX_STANDARD 11)
 
-add_definitions(-DSODIUM_STATIC -DDEBUG -D_CONSOLE)
+add_definitions(-DSODIUM_STATIC -DDEBUG -D_CONSOLE -DNATIVE_LITTLE_ENDIAN)
+#add_definitions(-DED25519_COMPAT)
 
 file(GLOB LOCAL_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
@@ -22,8 +23,22 @@ set(GTEST_SRC
 )
 
 
+file(GLOB_RECURSE LIBSODIUM_CRYPTO_SIGN_SRC
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_sign/*.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_sign/*.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_core/*.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_core/*.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_hash/*.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_hash/*.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_verify/*.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/crypto_verify/*.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/sodium/utils.c
+)
+
 set(SOURCE_FILES
         ${LOCAL_SRC}
+
+        ${LIBSODIUM_CRYPTO_SIGN_SRC}
 
         ${GTEST_SRC}
 )
@@ -40,7 +55,7 @@ include_directories(
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
-target_link_libraries(${PROJECT_NAME} curl)
+# target_link_libraries(${PROJECT_NAME} curl)
 if (WIN32)
     target_link_libraries(${PROJECT_NAME} ws2_32)
 else (WIN32)
