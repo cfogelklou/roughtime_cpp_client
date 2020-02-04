@@ -1,5 +1,5 @@
 /**
-* COPYRIGHT	(c)	Polestar 2019
+* COPYRIGHT	(c)	Applicaudia 2019
 * @file     roughtime_servers.cpp
 * @brief    Indexable list of roughtime servers trusted by the firmware.
 */
