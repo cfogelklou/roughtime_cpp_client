@@ -122,7 +122,12 @@ TEST(TestRt, SendRequestOk){
   sstring req;
   uint8_t nonce[64];
   stupidRandom(nonce, sizeof(nonce));
-  nonce[0] = 0xff;
+  RoughTime::GenerateRequest(req, nonce, sizeof(nonce));
+  ASSERT_EQ(req.length(), 80);
+  RoughTime::PadRequest(req, req);
+  ASSERT_EQ(req.length(), 1024);
+  const uint8_t* pr = req.u_str();
+  EXPECT_EQ(pr[0], 2); // 2 tags
 
   sstring rxBuf;
 
@@ -174,7 +179,12 @@ TEST(TestRt, SendRequestError){
   sstring req;
   uint8_t nonce[64];
   stupidRandom(nonce, sizeof(nonce));
-  nonce[0] = 0xff;
+  RoughTime::GenerateRequest(req, nonce, sizeof(nonce));
+  ASSERT_EQ(req.length(), 80);
+  RoughTime::PadRequest(req, req);
+  ASSERT_EQ(req.length(), 1024);
+  const uint8_t* pr = req.u_str();
+  EXPECT_EQ(pr[0], 2); // 2 tags
 
   sstring rxBuf;
 
@@ -199,7 +209,7 @@ TEST(TestRt, SendRequestError){
       std::time_t now = std::time(0);
       uint64_t compareTo = (uint64_t)now;
       auto diff = fabs(compareTo - midpoint);
-      EXPECT_LE(diff, 2000);
+      EXPECT_GT(diff, 10000000);
 
       // Indicate that time was ok.
       nonce[0] = 0;
