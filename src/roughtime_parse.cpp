@@ -1,167 +1,98 @@
+/**
+* COPYRIGHT	(c)	Applicaudia 2019
+* @file     roughtime_parse.cpp
+* @brief    Parses a roughtime response in firmware or app.
+*/
 
-#include "roughtime.hpp"
 #include "crypto_sign.h"
-#include <string>
-#include <chrono>
+#include "utils/platform_log.h"
+#include "utils/helper_macros.h"
+#include "roughtime_parse.hpp"
+#include "osal/endian_convert.h"
+#include "utils/simple_string.hpp"
+#include <cstring>
 
-#include <assert.h>
-#define LOG_TRACE(x) std::printf x
-#define LOG_WARNING(x) std::printf x
-#define LOG_ASSERT_WARN(state) if (!(state)) \
-do { LOG_WARNING(("Assertion Failed at %s(%d)\r\n", __FILE__, __LINE__)); } while(0)
-
-#ifndef MIN
-#define MIN(x,y) (((x) < (y)) ? (x) : (y))
-#endif
-
-// ////////////////////////////////////////////////////////////////////////////
-static uint64_t rt_seconds_since_epoch() {
-  auto now = std::chrono::duration_cast<std::chrono::milliseconds>
-    (std::chrono::system_clock::now().time_since_epoch()).count();
-  return (uint64_t)now;
-}
+LOG_MODNAME("roughtime_parse.cpp");
 
 // /////////////////////////////////////////////////////////////////////////////
-RtClient::RtClient()
-: nonce()
-, ts_request(0)
-{
-}
-
-// /////////////////////////////////////////////////////////////////////////////
-RtClient::~RtClient(){
-  
-}
-
-typedef union RtRequestTag {
-  struct {
-    uint32_t num_tags_le;
-    uint32_t offset1_le;
-    uint32_t nonce_le;
-    uint32_t pad_le;
-    uint8_t  nonce[64];
-  } req;
-  uint8_t u[80];
-} RtRequestT;
-
-// /////////////////////////////////////////////////////////////////////////////
-void RtClient::GenerateRequest(std::ustring &request){
-  uint64_t ts = rt_seconds_since_epoch();
-  
-  RtRequestT req;
-  req.req.num_tags_le = HOSTTOLE32(2);
-  req.req.offset1_le = HOSTTOLE32(64); // Padding starts at offset 64
-  req.req.nonce_le = HOSTTOLE32(roughtime::NONC);
-  req.req.pad_le = HOSTTOLE32(roughtime::PAD);
-  memset(nonce, 0, sizeof(nonce));
-  memcpy(nonce, &ts, sizeof(ts));
-  memcpy(req.req.nonce, nonce, sizeof(nonce));
-  request.assign(req.u, sizeof(req));
-}
-
-// /////////////////////////////////////////////////////////////////////////////
-void RtClient::PadRequest(
-  const std::ustring &unpadded,
-  std::ustring &padded)
-{
-  if (((void *)&unpadded) != ((void *)&padded)){
-    padded.clear();
-    padded.insert(0, unpadded.data(), sizeof(RtRequestT));
-  }
-  else {
-    std::ustring tmp = unpadded;
-    padded.clear();
-    padded.insert(0, tmp.data(), sizeof(RtRequestT));
-  }
-  uint8_t effeff[1024-sizeof(RtRequestT)];
-  memset(effeff, 0xff, sizeof(effeff));
-  padded.insert(sizeof(RtRequestT), effeff, sizeof(effeff));
-
-}
-
-// /////////////////////////////////////////////////////////////////////////////
-static int reject(const uint8_t b[], const char *message) {
+static int rp_reject(const uint8_t b[], const char *message) {
+  (void)b;
+  LOG_WARNING(("RoughTime::rejected due to %s\r\n", message));
   return -1;
 }
 
 // /////////////////////////////////////////////////////////////////////////////
-static uint32_t uint32(const uint8_t b[], const int i) {
+static uint32_t rp_get_uint32_at(const uint8_t b[], const int i) {
   uint32_t tmp;
   memcpy(&tmp, &b[i], sizeof(tmp));
   return LE32TOHOST(tmp);
 }
 
 // /////////////////////////////////////////////////////////////////////////////
-static uint64_t uint64(const uint8_t b[], const int i) {
+static uint64_t rp_get_uint64_at(const uint8_t b[], const int i) {
   uint64_t tmp;
   memcpy(&tmp, &b[i], sizeof(tmp));
   return LE64TOHOST(tmp);
 }
 
 // /////////////////////////////////////////////////////////////////////////////
-static const uint8_t * subarray(
-  const std::ustring &bstr,
+static const uint8_t * rp_subarray(
+  const sstring &bstr,
   const size_t fromIdx,
   const size_t toIdx, // up to AND INCLUDING
-  std::ustring &out) {
-  const size_t end = MIN(toIdx, (bstr.size() - 1));
+  sstring &out) {
+  const size_t end = MIN(((int)toIdx), ((int)(bstr.length() - 1)));
   const size_t beg = MIN(end, fromIdx);
   const int len = end - beg;
-  assert(len >= 0);
+  LOG_ASSERT(len >= 0);
   out.clear();
-  const uint8_t * const b = bstr.data();
+  const uint8_t * const b = bstr.u_str();
   out.assign(&b[beg], len);
 
-  LOG_ASSERT_WARN(out.length() == (toIdx - fromIdx));
-  return out.data();
+  LOG_ASSERT_WARN(out.length() == ((int)toIdx - (int)fromIdx));
+  return out.u_str();
 }
 
-
 // /////////////////////////////////////////////////////////////////////////////
-static bool verify
+static bool rp_verify
  (
-  const std::ustring &sigstr,
-  const std::ustring &prefix,
-  const std::ustring &bstring,
+  const sstring &sigstr,
+  const sstring &prefix,
+  const sstring &bstring,
   const int start,
   const int end,
-  const std::ustring &pubkey
+  const sstring &pubkey
  )
 {
-  std::ustring signedStr;
-  subarray(bstring, start, end, signedStr);
+  sstring signedStr;
+  rp_subarray(bstring, start, end, signedStr);
 
-  std::ustring scratch1(prefix);
+  sstring scratch1(prefix);
   scratch1.append(signedStr);
 
-  int noob = crypto_sign_verify_detached(
-    sigstr.data(),
-    scratch1.data(),
+  const int noob = crypto_sign_verify_detached(
+    sigstr.u_str(),
+    scratch1.u_str(),
     scratch1.length(),
-    pubkey.data());
+    pubkey.u_str());
 
   return (0 == noob);
 
 }
 
 // /////////////////////////////////////////////////////////////////////////////
-const uint8_t *RtClient::GetNonce() {
-  return nonce;
-}
+static const char rp_CertificateContext[] = "RoughTime v1 delegation signature--";
+static const char rp_SignedResponseContext[] = "RoughTime v1 response signature";
 
 // /////////////////////////////////////////////////////////////////////////////
-static const char certificateContext[] = "RoughTime v1 delegation signature--";
-static const char signedResponseContext[] = "RoughTime v1 response signature";
-
-// /////////////////////////////////////////////////////////////////////////////
-uint64_t RtClient::Parse(
+uint64_t RoughTime::ParseToMicroseconds(
   const uint8_t pubkey[32],
   const uint8_t nonce[64],
   const uint8_t b[],
   const size_t b_length,
   ParseOutT * const pOut
 ) {
-  std::ustring bstring;
+  sstring bstring;
   bstring.assign(b, b_length);
 
   int CERT_tagstart = -1;
@@ -196,20 +127,20 @@ uint64_t RtClient::Parse(
   int n = b_length;
 
   if (n % 4 > 0) {
-    return reject(b, "short message");
+    return rp_reject(b, "short message");
   }
 
   bool done = false;
   while (!done) {
     if (i + 4 > n) {
-      return reject(b, "short message");
+      return rp_reject(b, "short message");
     }
 
-    const uint32_t ntags = uint32(b, i);
+    const uint32_t ntags = rp_get_uint32_at(b, i);
     i += 4;
 
     if (ntags == 0) {
-      return reject(b, "no tags"); // not technically illegal but...
+      return rp_reject(b, "no tags"); // not technically illegal but...
     }
 
     const int firstoffset = i;
@@ -223,23 +154,23 @@ uint64_t RtClient::Parse(
     const int firstdatabyte = i;
 
     if (i > n) {
-      return reject(b, "short message");
+      return rp_reject(b, "short message");
     }
 
     for (int last = -1, j = firstoffset; j < lastoffset; j += 4) {
-      const int32_t offset = uint32(b, j);
+      const int32_t offset = rp_get_uint32_at(b, j);
 
       if (offset < last) {
-        return reject(b, "illegal offset (order)");
+        return rp_reject(b, "illegal offset (order)");
       }
       last = offset;
 
       if (offset % 4 > 0) {
-        return reject(b, "illegal offset (alignment)");
+        return rp_reject(b, "illegal offset (alignment)");
       }
 
       if (offset + firstdatabyte > n) {
-        return reject(b, "illegal offset (range)");
+        return rp_reject(b, "illegal offset (range)");
       }
     }
 
@@ -250,31 +181,31 @@ uint64_t RtClient::Parse(
       tagend = n;
 
       if (j + 4 < lasttag) {
-        tagend = firstdatabyte + uint32(b, j - firsttag + firstoffset);
+        tagend = firstdatabyte + rp_get_uint32_at(b, j - firsttag + firstoffset);
       }
 
-      const uint32_t tag = uint32(b, j);
+      const uint32_t tag = rp_get_uint32_at(b, j);
 
       switch (s) {
       case 0: // toplevel
         switch (tag) {
-        case roughtime::CERT:
+        case RoughTime::CERT:
           CERT_tagstart = tagstart;
           CERT_tagend = tagend;
           break;
-        case roughtime::INDX:
+        case RoughTime::INDX:
           INDX_tagstart = tagstart;
           INDX_tagend = tagend;
           break;
-        case roughtime::PATH:
+        case RoughTime::PATH:
           PATH_tagstart = tagstart;
           PATH_tagend = tagend;
           break;
-        case roughtime::SIG:
+        case RoughTime::SIG:
           SIG_tagstart = tagstart;
           SIG_tagend = tagend;
           break;
-        case roughtime::SREP:
+        case RoughTime::SREP:
           SREP_tagstart = tagstart;
           SREP_tagend = tagend;
           break;
@@ -283,11 +214,11 @@ uint64_t RtClient::Parse(
 
       case 1: // CERT
         switch (tag) {
-        case roughtime::DELE:
+        case RoughTime::DELE:
           CERT_DELE_tagstart = tagstart;
           CERT_DELE_tagend = tagend;
           break;
-        case roughtime::SIG:
+        case RoughTime::SIG:
           CERT_SIG_tagstart = tagstart;
           CERT_SIG_tagend = tagend;
           break;
@@ -296,15 +227,15 @@ uint64_t RtClient::Parse(
 
       case 2: // CERT_DELE
         switch (tag) {
-        case roughtime::MAXT:
+        case RoughTime::MAXT:
           CERT_DELE_MAXT_tagstart = tagstart;
           CERT_DELE_MAXT_tagend = tagend;
           break;
-        case roughtime::MINT:
+        case RoughTime::MINT:
           CERT_DELE_MINT_tagstart = tagstart;
           CERT_DELE_MINT_tagend = tagend;
           break;
-        case roughtime::PUBK:
+        case RoughTime::PUBK:
           CERT_DELE_PUBK_tagstart = tagstart;
           CERT_DELE_PUBK_tagend = tagend;
           break;
@@ -313,15 +244,15 @@ uint64_t RtClient::Parse(
 
       case 3: // SREP
         switch (tag) {
-        case roughtime::MIDP:
+        case RoughTime::MIDP:
           SREP_MIDP_tagstart = tagstart;
           SREP_MIDP_tagend = tagend;
           break;
-        case roughtime::RADI:
+        case RoughTime::RADI:
           SREP_RADI_tagstart = tagstart;
           SREP_RADI_tagend = tagend;
           break;
-        case roughtime::ROOT:
+        case RoughTime::ROOT:
           SREP_ROOT_tagstart = tagstart;
           SREP_ROOT_tagend = tagend;
           break;
@@ -333,35 +264,35 @@ uint64_t RtClient::Parse(
     switch (s) {
     case 0: // toplevel
       if (CERT_tagstart < 0) {
-        return reject(b, "no CERT tag");
+        return rp_reject(b, "no CERT tag");
       }
 
       if (INDX_tagstart < 0) {
-        return reject(b, "no INDX tag");
+        return rp_reject(b, "no INDX tag");
       }
 
       if (INDX_tagend - INDX_tagstart != 4) {
-        return reject(b, "bad INDX tag");
+        return rp_reject(b, "bad INDX tag");
       }
 
       if (PATH_tagstart < 0) {
-        return reject(b, "no PATH tag");
+        return rp_reject(b, "no PATH tag");
       }
 
       if ((PATH_tagend - PATH_tagstart) % 64 != 0) {
-        return reject(b, "bad PATH tag");
+        return rp_reject(b, "bad PATH tag");
       }
 
       if (SIG_tagstart < 0) {
-        return reject(b, "no SIG tag");
+        return rp_reject(b, "no SIG tag");
       }
 
       if (SIG_tagend - SIG_tagstart != 64) {
-        return reject(b, "bad SIG tag");
+        return rp_reject(b, "bad SIG tag");
       }
 
       if (SREP_tagstart < 0) {
-        return reject(b, "no SREP tag");
+        return rp_reject(b, "no SREP tag");
       }
 
       i = CERT_tagstart;
@@ -371,15 +302,15 @@ uint64_t RtClient::Parse(
 
     case 1: // CERT
       if (CERT_DELE_tagstart < 0) {
-        return reject(b, "no CERT.DELE tag");
+        return rp_reject(b, "no CERT.DELE tag");
       }
 
       if (CERT_SIG_tagstart < 0) {
-        return reject(b, "no CERT.SIG tag");
+        return rp_reject(b, "no CERT.SIG tag");
       }
 
       if (CERT_SIG_tagend - CERT_SIG_tagstart != 64) {
-        return reject(b, "bad CERT.SIG tag");
+        return rp_reject(b, "bad CERT.SIG tag");
       }
 
       i = CERT_DELE_tagstart;
@@ -389,27 +320,27 @@ uint64_t RtClient::Parse(
 
     case 2: // CERT_DELE
       if (CERT_DELE_MAXT_tagstart < 0) {
-        return reject(b, "no CERT.DELE.MAXT tag");
+        return rp_reject(b, "no CERT.DELE.MAXT tag");
       }
 
       if (CERT_DELE_MAXT_tagend - CERT_DELE_MAXT_tagstart != 8) {
-        return reject(b, "bad CERT.DELE.MAXT tag");
+        return rp_reject(b, "bad CERT.DELE.MAXT tag");
       }
 
       if (CERT_DELE_MINT_tagstart < 0) {
-        return reject(b, "no CERT.DELE.MINT tag");
+        return rp_reject(b, "no CERT.DELE.MINT tag");
       }
 
       if (CERT_DELE_MINT_tagend - CERT_DELE_MINT_tagstart != 8) {
-        return reject(b, "bad CERT.DELE.MAXT tag");
+        return rp_reject(b, "bad CERT.DELE.MAXT tag");
       }
 
       if (CERT_DELE_PUBK_tagstart < 0) {
-        return reject(b, "no CERT.DELE.PUBK tag");
+        return rp_reject(b, "no CERT.DELE.PUBK tag");
       }
 
       if (CERT_DELE_PUBK_tagend - CERT_DELE_PUBK_tagstart != 32) {
-        return reject(b, "bad CERT.DELE.PUBK");
+        return rp_reject(b, "bad CERT.DELE.PUBK");
       }
 
       i = SREP_tagstart;
@@ -419,27 +350,27 @@ uint64_t RtClient::Parse(
 
     case 3: // SREP
       if (SREP_MIDP_tagstart < 0) {
-        return reject(b, "no SREP.MIDP tag");
+        return rp_reject(b, "no SREP.MIDP tag");
       }
 
       if (SREP_MIDP_tagend - SREP_MIDP_tagstart != 8) {
-        return reject(b, "bad SREP.MIDP tag");
+        return rp_reject(b, "bad SREP.MIDP tag");
       }
 
       if (SREP_RADI_tagstart < 0) {
-        return reject(b, "no SREP.RADI tag");
+        return rp_reject(b, "no SREP.RADI tag");
       }
 
       if (SREP_RADI_tagend - SREP_RADI_tagstart != 4) {
-        return reject(b, "bad SREP.RADI tag");
+        return rp_reject(b, "bad SREP.RADI tag");
       }
 
       if (SREP_ROOT_tagstart < 0) {
-        return reject(b, "no SREP.ROOT tag");
+        return rp_reject(b, "no SREP.ROOT tag");
       }
 
       if (SREP_ROOT_tagend - SREP_ROOT_tagstart != 64) {
-        return reject(b, "bad SREP.ROOT tag");
+        return rp_reject(b, "bad SREP.ROOT tag");
       }
 
       done = true;
@@ -448,30 +379,28 @@ uint64_t RtClient::Parse(
   } // for (;;)
 
   {
-    std::ustring sigstr;
-    subarray(bstring, CERT_SIG_tagstart, CERT_SIG_tagend, sigstr);
+    sstring sigstr;
+    rp_subarray(bstring, CERT_SIG_tagstart, CERT_SIG_tagend, sigstr);
 
-    std::ustring pubkeystr;
+    sstring pubkeystr;
     pubkeystr.assign(pubkey, 32);
-    std::ustring delegate;
-    std::ustring certificateContextStr((uint8_t *)certificateContext, strlen(certificateContext) + 1);
-    if (!verify(sigstr, certificateContextStr, bstring, CERT_DELE_tagstart, CERT_DELE_tagend, pubkeystr))
-    {
-      return reject(b, "CERT.DELE does not verify");
+    sstring delegate;
+    sstring certificateContextStr((uint8_t *)rp_CertificateContext, strlen(rp_CertificateContext) + 1);
+    if (!rp_verify(sigstr, certificateContextStr, bstring, CERT_DELE_tagstart, CERT_DELE_tagend, pubkeystr)) {
+      return rp_reject(b, "CERT.DELE does not verify");
     }
-
   }
 
   {
-    std::ustring sigstr;
-    subarray(bstring, SIG_tagstart, SIG_tagend, sigstr);
+    sstring sigstr;
+    rp_subarray(bstring, SIG_tagstart, SIG_tagend, sigstr);
 
-    std::ustring pubkeystr;
-    subarray(bstring, CERT_DELE_PUBK_tagstart, CERT_DELE_PUBK_tagend, pubkeystr);
+    sstring pubkeystr;
+    rp_subarray(bstring, CERT_DELE_PUBK_tagstart, CERT_DELE_PUBK_tagend, pubkeystr);
 
-    std::ustring signedResponseContextStr((uint8_t *)signedResponseContext, strlen(signedResponseContext) + 1);
-    if (!verify(sigstr, signedResponseContextStr, bstring, SREP_tagstart, SREP_tagend, pubkeystr)) {
-      return reject(b, "SREP does not verify");
+    sstring signedResponseContextStr((uint8_t *)rp_SignedResponseContext, strlen(rp_SignedResponseContext) + 1);
+    if (!rp_verify(sigstr, signedResponseContextStr, bstring, SREP_tagstart, SREP_tagend, pubkeystr)) {
+      return rp_reject(b, "SREP does not verify");
     }
   }
 
@@ -485,15 +414,6 @@ uint64_t RtClient::Parse(
     crypto_hash_sha512_update(&sha, nonce, 64);
     crypto_hash_sha512_final(&sha, h);
   }
-#if 0
-  for (int i = 0; i < sizeof(h); i += 8) {
-    printf("%d, %d, %d, %d, %d, %d, %d, %d, \r\n"
-      , h[i + 0], h[i + 1], h[i + 2], h[i + 3]
-      , h[i + 4], h[i + 5], h[i + 6], h[i + 7]
-    );
-  }
-  printf("\r\nhi\r\n");
-#endif 
 
   // //////////////////////////////////////////////////////////////////////////
   // HERE BE DRAGONS!
@@ -502,12 +422,12 @@ uint64_t RtClient::Parse(
   // //////////////////////////////////////////////////////////////////////////
   const auto pathlen = PATH_tagend - PATH_tagstart;
   if (pathlen > 0) {
-    uint32_t index = uint32(b, INDX_tagstart);
+    uint32_t index = rp_get_uint32_at(b, INDX_tagstart);
 
     for (int j = 0; j < pathlen; j += 64) {
-      std::ustring lStr;
-      subarray(bstring, PATH_tagstart + j, PATH_tagstart + j + 64, lStr);
-      const uint8_t *l = lStr.data();
+      sstring lStr;
+      rp_subarray(bstring, PATH_tagstart + j, PATH_tagstart + j + 64, lStr);
+      const uint8_t *l = lStr.u_str();
 
       //let r = h
       const uint8_t *r = h;
@@ -530,14 +450,6 @@ uint64_t RtClient::Parse(
         crypto_hash_sha512_final(&sha, h);
       }
 
-#if 0
-      for (int i = 0; i < sizeof(h); i += 8) {
-        printf("%d, %d, %d, %d, %d, %d, %d, %d, \r\n"
-          , h[i + 0], h[i + 1], h[i + 2], h[i + 3]
-          , h[i + 4], h[i + 5], h[i + 6], h[i + 7]
-        );
-      }
-#endif 
       index >>= 1;
     }
   }
@@ -548,44 +460,45 @@ uint64_t RtClient::Parse(
   {
     uint32_t i = 0;
 
+    LOG_ASSERT((64 + SREP_ROOT_tagstart) < ((int)b_length));
     for (int j = 0; j < 64; j++) {
       i ^= h[j];
       i ^= b[j + SREP_ROOT_tagstart];
     }
 
     if (i != 0) {
-      return reject(b, "ROOT does not verify");
+      return rp_reject(b, "ROOT does not verify");
     }
   }
 
   uint64_t midpoint, mintime, maxtime;
   const uint64_t deepFuture = 2097152ull << 32ull;
     // TODO(bnoordhuis) switch to BigInt before 2255 AD
-  midpoint = uint64(b, SREP_MIDP_tagstart);
+  midpoint = rp_get_uint64_at(b, SREP_MIDP_tagstart);
   if (midpoint > deepFuture)
-    return reject(b, "deep future midpoint");
+    return rp_reject(b, "deep future midpoint");
 
-  mintime = uint64(b, CERT_DELE_MINT_tagstart);
+  mintime = rp_get_uint64_at(b, CERT_DELE_MINT_tagstart);
   if (mintime > deepFuture)
-    return reject(b, "deep future mintime");
+    return rp_reject(b, "deep future mintime");
 
-  maxtime = uint64(b, CERT_DELE_MAXT_tagstart);
+  maxtime = rp_get_uint64_at(b, CERT_DELE_MAXT_tagstart);
   if (maxtime > deepFuture)
-    return reject(b, "deep future maxtime");
+    return rp_reject(b, "deep future maxtime");
 
   if (maxtime < mintime) {
-    return reject(b, "maxtime < mintime");
+    return rp_reject(b, "maxtime < mintime");
   }
 
   if (midpoint < mintime) {
-    return reject(b, "midpoint < mintime");
+    return rp_reject(b, "midpoint < mintime");
   }
 
   if (midpoint > maxtime) {
-    return reject(b, "midpoint > maxtime");
+    return rp_reject(b, "midpoint > maxtime");
   }
   
-  const uint32_t radius = uint32(b, SREP_RADI_tagstart);
+  const uint32_t radius = rp_get_uint32_at(b, SREP_RADI_tagstart);
 
   if (pOut) {
     pOut->maxtime = maxtime;
