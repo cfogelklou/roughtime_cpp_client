@@ -1,6 +1,7 @@
 #define USE_CURL 0
 
-#include "src/roughtime.hpp"
+#include "src/roughtime_request.hpp"
+#include "src/roughtime_parse.hpp"
 
 #if (USE_CURL > 0)
 #include <curl/curl.h>
@@ -23,14 +24,18 @@ TEST(TestCurl, curl_1) {
 }
 #endif
 
-TEST(TestRt, Constructor){
-  RtClient rt;
+
+static void stupidRandom(uint8_t *buf, int cnt) {
+  for (int i = 0; i < cnt; i++) {
+    buf[i] = rand() % 255;
+  }
 }
 
 TEST(TestRt, UnpaddedRequest){
-  RtClient rt;
-  std::ustring req;
-  rt.GenerateRequest(req);
+  sstring req;
+  uint8_t nonce[64];
+  stupidRandom(nonce, sizeof(nonce));
+  RoughTime::GenerateRequest(req, nonce, sizeof(nonce));
   ASSERT_EQ(req.length(), 80);
   const uint8_t *pr = req.data();
   EXPECT_EQ(pr[0], 2); // 2 tags
@@ -53,11 +58,12 @@ TEST(TestRt, UnpaddedRequest){
 }
 
 TEST(TestRt, PaddedRequest){
-  RtClient rt;
-  std::ustring req;
-  rt.GenerateRequest(req);
+  sstring req;
+  uint8_t nonce[64];
+  stupidRandom(nonce, sizeof(nonce));
+  RoughTime::GenerateRequest(req, nonce, sizeof(nonce));
   ASSERT_EQ(req.length(), 80);
-  rt.PadRequest(req, req);
+  RoughTime::PadRequest(req, req);
   ASSERT_EQ(req.length(), 1024);
   const uint8_t *pr = req.data();
   EXPECT_EQ(pr[0], 2); // 2 tags
@@ -97,8 +103,8 @@ TEST(TestRt, RoughtimeParse) {
   const uint64_t midpoint = 1551958790167000;
   const uint64_t radius = 1000000;
 
-  RtClient::ParseOutT times;
-  EXPECT_EQ(midpoint, RtClient::Parse(pubkey, nonce, answer, sizeof(answer), &times));
+  RoughTime::ParseOutT times;
+  EXPECT_EQ(midpoint, RoughTime::ParseToMicroseconds(pubkey, nonce, answer, sizeof(answer), &times));
 
   EXPECT_EQ(times.radius, radius);
   EXPECT_EQ(times.midpoint, midpoint);
@@ -117,11 +123,12 @@ TEST(TestRt, RoughtimeSend) {
 #include "mini_socket.hpp"
 
 TEST(TestRt, SendRequest){
-  RtClient rt;
-  std::ustring req;
-  rt.GenerateRequest(req);
+  sstring req;
+  uint8_t nonce[64];
+  stupidRandom(nonce, sizeof(nonce));
+  RoughTime::GenerateRequest(req, nonce, sizeof(nonce));
   ASSERT_EQ(req.length(), 80);
-  rt.PadRequest(req, req);
+  RoughTime::PadRequest(req, req);
   ASSERT_EQ(req.length(), 1024);
   const uint8_t *pr = req.data();
   EXPECT_EQ(pr[0], 2); // 2 tags
@@ -145,8 +152,14 @@ TEST(TestRt, SendRequest){
 
   QueueBase &p = CreateUdpClient("roughtime.cloudflare.com", 2002);
   p.Write(req.data(), req.length());
-  usleep(100000);
-  const size_t bytes = p.GetReadReady();
+  size_t bytes = 0;
+  int tries = 0;
+  while ((tries < 1000) && (0 == bytes)){
+    usleep(100000);
+    bytes = p.GetReadReady();
+    tries++;
+  }
+
   EXPECT_GT(bytes, 0u);
   if (bytes) {
     uint8_t buf[1024];
@@ -154,9 +167,9 @@ TEST(TestRt, SendRequest){
     EXPECT_EQ(amtRead, bytes);
 
     const uint8_t pubkey[] = { 128, 62, 183, 133, 40, 247, 73, 196, 190, 194, 227, 158, 26, 187, 155, 94, 90, 183, 228, 221, 92, 228, 182, 242, 253, 47, 147, 236, 195, 83, 143, 26 };
-    RtClient::ParseOutT times;
+    RoughTime::ParseOutT times;
     
-    uint64_t midpoint = RtClient::Parse(pubkey, rt.GetNonce(), buf, amtRead, &times);
+    uint64_t midpoint = RoughTime::ParseToMicroseconds(pubkey, nonce, buf, amtRead, &times);
     midpoint /= (1000ull*1000ull);
 
     std::time_t now = std::time(0);
