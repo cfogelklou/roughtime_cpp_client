@@ -1,9 +1,6 @@
-[submodule "libsodium"]
-	path = libsodium
-	url = https://github.com/jedisct1/libsodium
-[submodule "googletest"]
-	path = googletest
-	url = https://github.com/google/googletest
 [submodule "curl"]
 	path = curl
 	url = https://github.com/curl/curl
+[submodule "sop"]
+	path = sop
+	url = https://github.com/cfogelklou/sweet_osal_platform.git
