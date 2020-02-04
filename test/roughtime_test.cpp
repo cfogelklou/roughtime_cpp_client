@@ -4,6 +4,7 @@
 #include "src/roughtime_parse.hpp"
 #include "utils/platform_log.h"
 #include "buf_io/buf_io_queue.hpp"
+#include "src/roughtime_servers.hpp"
 
 LOG_MODNAME("roughtime_test.cpp");
 
@@ -115,43 +116,18 @@ TEST(TestRt, RoughtimeParse) {
 
 }
 
-TEST(TestRt, RoughtimeSend) {
-  const uint8_t nonce[] = { 242,255,68,93,235,98,11,53,248,11,11,42,185,146,154,114,6,153,211,252,204,238,171,235,78,0,245,40,116,124,115,181,176,55,95,43,116,251,88,40,60,117,141,163,203,151,226,90,202,211,43,252,217,50,60,192,151,61,7,26,216,137,133,110 };
-  const uint8_t answer[] = { 5, 0, 0, 0, 64, 0, 0, 0, 64, 0, 0, 0, 164, 0, 0, 0, 60, 1, 0, 0, 83, 73, 71, 0, 80, 65, 84, 72, 83, 82, 69, 80, 67, 69, 82, 84, 73, 78, 68, 88, 217, 138, 43, 155, 232, 101, 19, 17, 204, 180, 107, 70, 130, 81, 248, 45, 0, 180, 198, 96, 109, 59, 211, 118, 172, 90, 96, 15, 1, 227, 147, 25, 70, 246, 16, 182, 20, 114, 41, 95, 117, 116, 168, 97, 207, 147, 252, 125, 121, 181, 99, 11, 120, 197, 17, 135, 206, 129, 41, 236, 214, 154, 193, 2, 3, 0, 0, 0, 4, 0, 0, 0, 12, 0, 0, 0, 82, 65, 68, 73, 77, 73, 68, 80, 82, 79, 79, 84, 64, 66, 15, 0, 160, 150, 146, 91, 127, 131, 5, 0, 192, 126, 226, 147, 9, 106, 35, 252, 9, 234, 110, 238, 23, 13, 26, 171, 10, 104, 181, 70, 53, 66, 250, 121, 48, 157, 11, 207, 220, 143, 163, 125, 39, 148, 28, 148, 69, 7, 66, 230, 77, 124, 157, 112, 139, 110, 169, 100, 148, 55, 172, 27, 186, 235, 206, 102, 229, 3, 140, 186, 200, 11, 55, 247, 2, 0, 0, 0, 64, 0, 0, 0, 83, 73, 71, 0, 68, 69, 76, 69, 200, 136, 163, 241, 194, 76, 82, 232, 237, 194, 224, 130, 205, 120, 66, 192, 91, 170, 105, 135, 125, 29, 135, 90, 103, 186, 255, 61, 22, 226, 99, 57, 254, 167, 174, 15, 121, 36, 116, 8, 77, 64, 150, 167, 188, 57, 161, 32, 122, 207, 62, 151, 146, 5, 212, 177, 185, 89, 252, 131, 231, 191, 27, 7, 3, 0, 0, 0, 32, 0, 0, 0, 40, 0, 0, 0, 80, 85, 66, 75, 77, 73, 78, 84, 77, 65, 88, 84, 178, 44, 182, 6, 18, 160, 216, 188, 147, 171, 123, 88, 36, 97, 220, 213, 191, 42, 77, 203, 24, 205, 201, 211, 26, 179, 250, 213, 180, 205, 155, 172, 152, 37, 242, 169, 119, 131, 5, 0, 152, 133, 201, 199, 139, 131, 5, 0, 0, 0, 0, 0 };
-  const uint8_t pubkey[] = { 128, 62, 183, 133, 40, 247, 73, 196, 190, 194, 227, 158, 26, 187, 155, 94, 90, 183, 228, 221, 92, 228, 182, 242, 253, 47, 147, 236, 195, 83, 143, 26 };
-  const uint64_t midpoint = 1551957903972000;
-  const uint64_t radius = 1000000;
-}
-
 #include "mini_socket/mini_socket.hpp"
 
 TEST(TestRt, SendRequestOk){
   sstring req;
   uint8_t nonce[64];
   stupidRandom(nonce, sizeof(nonce));
-  nonce[0] = 0xff;
   RoughTime::GenerateRequest(req, nonce, sizeof(nonce));
   ASSERT_EQ(req.length(), 80);
   RoughTime::PadRequest(req, req);
   ASSERT_EQ(req.length(), 1024);
-  const uint8_t *pr = req.u_str();
+  const uint8_t* pr = req.u_str();
   EXPECT_EQ(pr[0], 2); // 2 tags
-  EXPECT_EQ(pr[1], 0);
-  EXPECT_EQ(pr[2], 0);
-  EXPECT_EQ(pr[3], 0);
-  EXPECT_EQ(pr[4], 64); // Second tag has offset 64
-  EXPECT_EQ(pr[5], 0);
-  EXPECT_EQ(pr[6], 0);
-  EXPECT_EQ(pr[7], 0);
-  EXPECT_EQ(pr[8], 'N'); // First data (at offset zero) has tag nonc
-  EXPECT_EQ(pr[9], 'O');
-  EXPECT_EQ(pr[10], 'N');
-  EXPECT_EQ(pr[11], 'C');
-  EXPECT_EQ(pr[12], 'P'); // Second data (at offset 64) has tag PAD
-  EXPECT_EQ(pr[13], 'A');
-  EXPECT_EQ(pr[14], 'D');
-  EXPECT_EQ(pr[15], 0xff);
-  EXPECT_EQ(pr[1023], 0xff);
 
   sstring rxBuf;
 
@@ -162,7 +138,9 @@ TEST(TestRt, SendRequestOk){
     EXPECT_GT(bytes, 0u);
     if (bytes) {
 
-      const uint8_t pubkey[] = { 128, 62, 183, 133, 40, 247, 73, 196, 190, 194, 227, 158, 26, 187, 155, 94, 90, 183, 228, 221, 92, 228, 182, 242, 253, 47, 147, 236, 195, 83, 143, 26 };
+      uint8_t pubkey[32];
+      const RoughtimeServer * srv = RoughtimeGetServerAtIdx(0);
+      RoughtimeGetKey(srv, pubkey);
       RoughTime::ParseOutT times;
 
       uint64_t midpoint = RoughTime::ParseToMicroseconds(pubkey, nonce, buf, bytes, &times);
@@ -179,15 +157,16 @@ TEST(TestRt, SendRequestOk){
     }
   };
 
+  const RoughtimeServer * srv = RoughtimeGetServerAtIdx(0);
+  
   BufIOQTransT rxTrans(rxBuf.u8DataPtr(1024, 1024), 1024, onSocketRead, nonce);
   
-  BufIOQueue *ptr = CreateUdpClient("roughtime.cloudflare.com", 2002);
+  BufIOQueue *ptr = CreateUdpClient(srv->addr, srv->port);
   EXPECT_TRUE(ptr != nullptr);
   LOG_ASSERT(ptr);
   BufIOQueue& p = *ptr;
   p.QueueRead(&rxTrans);
   p.Write(req.u_str(), req.length());
-  size_t bytes = 0;
   int tries = 0;
   while ((tries < 1000) && (nonce[0])){
     usleep(10000);
@@ -196,46 +175,32 @@ TEST(TestRt, SendRequestOk){
      
 }
 
-TEST(TestRt, SendRequestError) {
+TEST(TestRt, SendRequestError){
   sstring req;
   uint8_t nonce[64];
   stupidRandom(nonce, sizeof(nonce));
-  nonce[0] = 0xff;
   RoughTime::GenerateRequest(req, nonce, sizeof(nonce));
   ASSERT_EQ(req.length(), 80);
   RoughTime::PadRequest(req, req);
   ASSERT_EQ(req.length(), 1024);
   const uint8_t* pr = req.u_str();
   EXPECT_EQ(pr[0], 2); // 2 tags
-  EXPECT_EQ(pr[1], 0);
-  EXPECT_EQ(pr[2], 0);
-  EXPECT_EQ(pr[3], 0);
-  EXPECT_EQ(pr[4], 64); // Second tag has offset 64
-  EXPECT_EQ(pr[5], 0);
-  EXPECT_EQ(pr[6], 0);
-  EXPECT_EQ(pr[7], 0);
-  EXPECT_EQ(pr[8], 'N'); // First data (at offset zero) has tag nonc
-  EXPECT_EQ(pr[9], 'O');
-  EXPECT_EQ(pr[10], 'N');
-  EXPECT_EQ(pr[11], 'C');
-  EXPECT_EQ(pr[12], 'P'); // Second data (at offset 64) has tag PAD
-  EXPECT_EQ(pr[13], 'A');
-  EXPECT_EQ(pr[14], 'D');
-  EXPECT_EQ(pr[15], 0xff);
-  EXPECT_EQ(pr[1023], 0xff);
 
   sstring rxBuf;
 
   auto onSocketRead = [](struct BufIOQTransTag* pTransaction) {
-    uint8_t* nonce = (uint8_t*)pTransaction->pUserData;
+    uint8_t* nonce = (uint8_t * )pTransaction->pUserData;
     auto bytes = pTransaction->transferredIdx;
     const uint8_t* const buf = pTransaction->pBuf8;
     EXPECT_GT(bytes, 0u);
     if (bytes) {
 
-     //const uint8_t pubkey[] = { 128, 62, 183, 133, 40, 247, 73, 196, 190, 194, 227, 158, 26, 187, 155, 94, 90, 183, 228, 221, 92, 228, 182, 242, 253, 47, 147, 236, 195, 83, 143, 26 };
-      LOG_TRACE(("Use a bad key\r\n"));
-      const uint8_t pubkey[] = { 128, 62, 183, 133, 40, 247, 73, 196, 190, 194, 226, 158, 26, 187, 155, 94, 90, 183, 228, 221, 92, 228, 182, 242, 253, 47, 147, 236, 195, 83, 143, 26 };
+      uint8_t pubkey[32];
+      const RoughtimeServer * srv = RoughtimeGetServerAtIdx(0);
+      RoughtimeGetKey(srv, pubkey);
+      
+      LOG_TRACE(("Corrupting 1 bit of the public key to confirm that times don't verify\r\n"));
+      pubkey[12] = pubkey[12] ^ 0x01;
       RoughTime::ParseOutT times;
 
       uint64_t midpoint = RoughTime::ParseToMicroseconds(pubkey, nonce, buf, bytes, &times);
@@ -244,7 +209,7 @@ TEST(TestRt, SendRequestError) {
       std::time_t now = std::time(0);
       uint64_t compareTo = (uint64_t)now;
       auto diff = fabs(compareTo - midpoint);
-      EXPECT_GT(diff, 1000000);
+      EXPECT_GT(diff, 10000000);
 
       // Indicate that time was ok.
       nonce[0] = 0;
@@ -252,23 +217,23 @@ TEST(TestRt, SendRequestError) {
     }
   };
 
+  const RoughtimeServer * srv = RoughtimeGetServerAtIdx(0);
+  
   BufIOQTransT rxTrans(rxBuf.u8DataPtr(1024, 1024), 1024, onSocketRead, nonce);
-
-  BufIOQueue* ptr = CreateUdpClient("roughtime.cloudflare.com", 2002);
+  
+  BufIOQueue *ptr = CreateUdpClient(srv->addr, srv->port);
   EXPECT_TRUE(ptr != nullptr);
   LOG_ASSERT(ptr);
   BufIOQueue& p = *ptr;
   p.QueueRead(&rxTrans);
   p.Write(req.u_str(), req.length());
-  size_t bytes = 0;
   int tries = 0;
-  while ((tries < 1000) && (nonce[0])) {
+  while ((tries < 1000) && (nonce[0])){
     usleep(10000);
   }
   DeleteUdpClient(&p);
-
+     
 }
-
 
 int main(int argc, char** argv){
   
