@@ -3,16 +3,28 @@ A simple roughtime client using libsodium for signature verification, suitable f
 
 Uses some simple stubs for sending/receiving data from a roughtime server.
 
-## Building and running the unit test (Linux or OSX)
+## Building and running the unit tests.
+
+Regardless of platform, you need CMake to build the unit tests.
+
+### Linux, macOS, etc
 
 ```bash
-
 git clone git@github.com:cfogelklou/roughtime_cpp_client.git --recursive
 cd roughtime_cpp_client
 mkdir build && cd build
 cmake ..
 make -j8
 ctest
-
 ```
 
+### Windows + Visual Studio 20xx
+
+```bash
+git clone git@github.com:cfogelklou/roughtime_cpp_client.git --recursive
+cd roughtime_cpp_client
+mkdir build && cd build
+explorer.exe .
+```
+
+(Now open the .sln file in Visual Studio)
