@@ -5,9 +5,8 @@
 */
 
 #include "roughtime_servers.hpp"
-#include "utils/helper_macros.h"
-#include "utils/simple_string.hpp"
-#include "utils/convert_utils.h"
+#include "roughtime_private.hpp"
+
 
 extern "C" {
 
@@ -21,21 +20,6 @@ const RoughtimeServer RoughtimeServersArr[] = {
 
 const size_t RoughtimeServersCount = ARRSZ(RoughtimeServersArr);
 
-const char * RoughtimeServerIsTrusted(const uint8_t keyBin[], const size_t keySz) {
-  int trustedIdx = -1;
-  if ((keyBin) && (keySz == 32)) {
-    sstring key;
-    CNV_BinToHexStr(keyBin, keySz, key, false);
-    for (int i = 0; (trustedIdx < 0) && (i < (int)RoughtimeServersCount); i++) {
-      const RoughtimeServer &entry = RoughtimeServersArr[i];
-      if (0 == memcmp(key.c_str(), entry.keyHex, 64)) {
-        trustedIdx = i;
-      }
-    }
-  }
-  return (trustedIdx >= 0) ? RoughtimeServersArr[trustedIdx].addr : nullptr;
-}
-
 // ////////////////////////////////////////////////////////////////////////////
 const RoughtimeServer * RoughtimeGetServerAtIdx(const int idx) {
   if (idx < (int)RoughtimeServersCount) {
@@ -46,13 +30,21 @@ const RoughtimeServer * RoughtimeGetServerAtIdx(const int idx) {
   }
 }
 
+
 // ////////////////////////////////////////////////////////////////////////////
 bool RoughtimeGetKey(const RoughtimeServer *p, uint8_t keyBin[32]) {
+
   bool rval = false;
   if (p) {
-    sstring szPk;
-    CNV_AsciiHexToBinStr(p->keyHex, 64, szPk);
-    memcpy(keyBin, szPk.u_str(), 32);
+    int i = 0;
+    for (int o = 0; o < 32; o++) {
+      char msn = toupper(p->keyHex[i + 0]);
+      char lsn = toupper(p->keyHex[i + 1]);
+      uint8_t m = (msn >= 'A') ? msn - 'A' + 10 : msn - '0';
+      uint8_t l = (lsn >= 'A') ? lsn - 'A' + 10 : lsn - '0';
+      keyBin[o] = (m << 4) + l;
+      i += 2;
+    }
     rval = true;
   }
   return rval;

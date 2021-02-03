@@ -5,11 +5,14 @@
 */
 
 #include "roughtime_request.hpp"
+#include "roughtime_private.hpp"
 #include "crypto_sign.h"
-#include "utils/platform_log.h"
-#include "utils/helper_macros.h"
 
-LOG_MODNAME("roughtime_request.cpp");
+static void stupidRandom(uint8_t *buf, int cnt) {
+  for (int i = 0; i < cnt; i++) {
+    buf[i] = rand() % 255;
+  }
+}
 
 typedef union RtRequestTag {
   struct {
@@ -30,7 +33,6 @@ void RoughTime::GenerateRequest(
   ){
   LOG_ASSERT(nullptr != nonce);
   LOG_ASSERT(nonceLen == 64);
-
 
   RpRequestT req;
   req.req.num_tags_le = HOSTTOLE32(2);

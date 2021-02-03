@@ -7,12 +7,11 @@
 * @brief    Creates a request for a roughtime timestamp.
 */
 
-#include "osal/endian_convert.h"
-#include "utils/simple_string.hpp"
-#include <cstring>
-#include <cstdint>
 
 #ifdef __cplusplus
+#include <cstring>
+#include <cstdint>
+#include "roughtime_private.hpp"
 
 namespace RoughTime {
   // These must be LE-ified
