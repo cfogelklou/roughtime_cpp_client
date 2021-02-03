@@ -1,7 +1,14 @@
-#include "roughtime_parse.hpp"
+/**
+* COPYRIGHT	(c)	Applicaudia 2019
+* @file     roughtime_parse.cpp
+* @brief    Parses a roughtime response in firmware or app.
+*/
+
 #include "crypto_sign.h"
 #include "roughtime_private.hpp"
-
+#include "roughtime_common.hpp"
+#include <cstring>
+#include <string>
 
 // /////////////////////////////////////////////////////////////////////////////
 static int rp_reject(const uint8_t b[], const char *message) {
@@ -38,7 +45,7 @@ static const uint8_t * rp_subarray(
   const uint8_t * const b = bstr.u_str();
   out.assign(&b[beg], len);
 
-  LOG_ASSERT_WARN(out.length() == (toIdx - fromIdx));
+  LOG_ASSERT_WARN(out.length() == ((int)toIdx - (int)fromIdx));
   return out.u_str();
 }
 

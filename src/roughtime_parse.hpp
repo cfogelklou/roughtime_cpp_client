@@ -1,15 +1,20 @@
 #ifndef ROUGHTIME_PARSE_HPP
 #define ROUGHTIME_PARSE_HPP 1
 
-#include <string>
-#include <cstdint>
+/**
+* COPYRIGHT	(c)	Applicaudia 2019
+* @file     roughtime_parse.hpp
+* @brief    Parses a roughtime response in firmware or app.
+*/
+
+
 
 #ifdef __cplusplus
-
 #include "roughtime_common.hpp"
-
-namespace RoughTime {
-  
+#include "roughtime_request.hpp"
+#include <string>
+#include <cstdint>
+namespace RoughTime {  
 
   typedef struct ParseOutTag {
     uint64_t midpoint;

@@ -1,3 +1,9 @@
+/**
+* COPYRIGHT	(c)	Applicaudia 2019
+* @file     roughtime_request.cpp
+* @brief    Creates a request for a roughtime timestamp.
+*/
+
 #include "roughtime_request.hpp"
 #include "roughtime_common.hpp"
 #include "roughtime_private.hpp"
@@ -23,12 +29,13 @@ typedef union RtRequestTag {
 // /////////////////////////////////////////////////////////////////////////////
 void RoughTime::GenerateRequest(
   sstring &request,
-  const uint8_t *pNonce,
+  const uint8_t nonce[64],
   const size_t  nonceLen
-) {
-  uint8_t nonce[64] = { 0 };
+  ){
+  LOG_ASSERT(nullptr != nonce);
+  LOG_ASSERT(nonceLen == 64);
 
-  if (pNonce && (nonceLen > 0)) {
+  if (nonce && (nonceLen > 0)) {
     const size_t len = MIN(nonceLen, sizeof(nonce));
     memcpy(nonce, pNonce, len);
   }
@@ -41,7 +48,7 @@ void RoughTime::GenerateRequest(
   req.req.offset1_le = HOSTTOLE32(64); // Padding starts at offset 64
   req.req.nonce_le = HOSTTOLE32(RoughTime::NONC);
   req.req.pad_le = HOSTTOLE32(RoughTime::PAD);
-  memcpy(req.req.nonce, nonce, sizeof(nonce));
+  memcpy(req.req.nonce, nonce, 64);
   request.assign(req.u, sizeof(req));
 }
 
@@ -50,7 +57,7 @@ void RoughTime::PadRequest(
   const sstring &unpadded,
   sstring &padded)
 {
-  if (((void *)&unpadded) != ((void *)&padded)) {
+  if (((void *)&unpadded) != ((void *)&padded)){
     padded.clear();
     padded.assign(unpadded.u_str(), sizeof(RpRequestT));
   }
@@ -59,7 +66,7 @@ void RoughTime::PadRequest(
     padded.clear();
     padded.assign(tmp.u_str(), sizeof(RpRequestT));
   }
-  uint8_t effeff[1024 - sizeof(RpRequestT)];
+  uint8_t effeff[1024-sizeof(RpRequestT)];
   memset(effeff, 0xff, sizeof(effeff));
   padded.append(effeff, sizeof(effeff));
 
