@@ -5,7 +5,7 @@
 */
 
 #include "roughtime_request.hpp"
-#include "roughtime_common.hpp"
+//#include "roughtime_common.hpp"
 #include "roughtime_private.hpp"
 #include "crypto_sign.h"
 
@@ -34,14 +34,6 @@ void RoughTime::GenerateRequest(
   ){
   LOG_ASSERT(nullptr != nonce);
   LOG_ASSERT(nonceLen == 64);
-
-  if (nonce && (nonceLen > 0)) {
-    const size_t len = MIN(nonceLen, sizeof(nonce));
-    memcpy(nonce, pNonce, len);
-  }
-  else {
-    stupidRandom(nonce, 64);
-  }
 
   RpRequestT req;
   req.req.num_tags_le = HOSTTOLE32(2);

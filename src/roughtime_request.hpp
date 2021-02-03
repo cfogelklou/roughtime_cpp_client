@@ -9,9 +9,10 @@
 
 
 #ifdef __cplusplus
-#include "roughtime_common.hpp"
+//#include "roughtime_common.hpp"
 #include <cstring>
 #include <cstdint>
+#include "roughtime_private.hpp"
 
 namespace RoughTime {
   // These must be LE-ified

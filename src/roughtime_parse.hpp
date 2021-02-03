@@ -10,7 +10,7 @@
 
 
 #ifdef __cplusplus
-#include "roughtime_common.hpp"
+//#include "roughtime_common.hpp"
 #include "roughtime_request.hpp"
 #include <string>
 #include <cstdint>

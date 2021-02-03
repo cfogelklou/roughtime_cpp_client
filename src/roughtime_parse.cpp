@@ -6,7 +6,9 @@
 
 #include "crypto_sign.h"
 #include "roughtime_private.hpp"
-#include "roughtime_common.hpp"
+//#include "roughtime_common.hpp"
+#include "roughtime_request.hpp"
+#include "roughtime_parse.hpp"
 #include <cstring>
 #include <string>
 
