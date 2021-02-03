@@ -5,14 +5,11 @@
 */
 
 #include "crypto_sign.h"
-#include "utils/platform_log.h"
-#include "utils/helper_macros.h"
+#include "roughtime_private.hpp"
+#include "roughtime_request.hpp"
 #include "roughtime_parse.hpp"
-#include "osal/endian_convert.h"
-#include "utils/simple_string.hpp"
 #include <cstring>
-
-LOG_MODNAME("roughtime_parse.cpp");
+#include <string>
 
 // /////////////////////////////////////////////////////////////////////////////
 static int rp_reject(const uint8_t b[], const char *message) {
@@ -43,7 +40,7 @@ static const uint8_t * rp_subarray(
   sstring &out) {
   const size_t end = MIN(((int)toIdx), ((int)(bstr.length() - 1)));
   const size_t beg = MIN(end, fromIdx);
-  const int len = end - beg;
+  const int len = (int)end - (int)beg;
   LOG_ASSERT(len >= 0);
   out.clear();
   const uint8_t * const b = bstr.u_str();
@@ -124,7 +121,7 @@ uint64_t RoughTime::ParseToMicroseconds(
 
   int s = 0;
   int i = 0;
-  int n = b_length;
+  int n = (int)b_length;
 
   if (n % 4 > 0) {
     return rp_reject(b, "short message");

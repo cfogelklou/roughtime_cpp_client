@@ -7,10 +7,13 @@
 * @brief    Parses a roughtime response in firmware or app.
 */
 
-#include "roughtime_request.hpp"
-#ifdef __cplusplus
 
-namespace RoughTime {
+
+#ifdef __cplusplus
+#include "roughtime_request.hpp"
+#include <string>
+#include <cstdint>
+namespace RoughTime {  
 
   typedef struct ParseOutTag {
     uint64_t midpoint;
