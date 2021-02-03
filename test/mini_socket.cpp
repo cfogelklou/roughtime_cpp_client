@@ -129,7 +129,7 @@ public:
   // //////////////////////////////////////////////////////////////////////////
   size_t Write(const uint8_t arr[], const size_t len) override {
     bool ok = true;
-    int stat = sendto(mSocket, (const char *)arr, len, 0, mpAddrInfo->ai_addr, mpAddrInfo->ai_addrlen);
+    int stat = sendto(mSocket, (const char *)arr, (int)len, 0, mpAddrInfo->ai_addr, (int)mpAddrInfo->ai_addrlen);
     ok = (stat == len);
     if (!ok) {
       auto err = WSAGetLastError();
@@ -151,7 +151,7 @@ public:
         UdpClient &th = *(UdpClient *)pThis;
 
         char  rxBuf[BUFLEN] = {0};
-        socklen_t alen = th.mpAddrInfo->ai_addrlen;
+        socklen_t alen = (socklen_t)th.mpAddrInfo->ai_addrlen;
         const int rx = recvfrom(th.mSocket, rxBuf, sizeof(rxBuf), 0, th.mpAddrInfo->ai_addr, &alen);
         if (SOCKET_ERROR != rx) {
           th.mRxQ.Write((uint8_t *)rxBuf, rx);

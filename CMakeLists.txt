@@ -5,6 +5,12 @@ set(CMAKE_CXX_STANDARD 11)
 
 add_definitions(-DSODIUM_STATIC -DDEBUG -D_CONSOLE -DNATIVE_LITTLE_ENDIAN)
 #add_definitions(-DED25519_COMPAT)
+if (WIN32)
+elseif (APPLE)
+    set(CMAKE_BUILD_TYPE Debug)
+elseif (UNIX)
+    set(CMAKE_BUILD_TYPE Debug)
+endif ()
 
 file(GLOB LOCAL_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
@@ -43,6 +49,8 @@ set(SOURCE_FILES
         ${GTEST_SRC}
 )
 
+list(REMOVE_DUPLICATES SOURCE_FILES)
+
 include_directories(
        .
        ${CMAKE_CURRENT_SOURCE_DIR}/libsodium/src/libsodium/include/sodium
@@ -55,11 +63,12 @@ include_directories(
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
+find_package(Threads REQUIRED)
+
 # target_link_libraries(${PROJECT_NAME} curl)
 if (WIN32)
     target_link_libraries(${PROJECT_NAME} ws2_32)
 else (WIN32)
-    find_package(Threads REQUIRED)
     target_link_libraries(${PROJECT_NAME} Threads::Threads)
 endif (WIN32)
 
