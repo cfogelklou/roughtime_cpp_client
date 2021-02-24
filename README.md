@@ -1,7 +1,10 @@
 # roughtime_cpp_client
+
+[![CI](https://github.com/cfogelklou/roughtime_cpp_client/actions/workflows/ci.yml/badge.svg)](https://github.com/cfogelklou/roughtime_cpp_client/actions/workflows/ci.yml)
+
 A simple roughtime client using libsodium for signature verification, suitable for embedding.
 
-Uses some simple stubs for sending/receiving data from a roughtime server.
+Uses some simple "socket" stubs for sending/receiving data from a roughtime server.
 
 ## Building and running the unit tests.
 
