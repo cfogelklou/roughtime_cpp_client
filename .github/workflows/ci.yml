@@ -57,12 +57,19 @@ jobs:
         cmake ..
         popd
 
-    - name: Build unit tests.
+    - name: Build unit tests (ubuntu or macos).
       if: (matrix.platform == 'ubuntu-latest') || (matrix.platform == 'macos-latest')
       run: |
         pushd build
         make -j4
-        popd        
+        popd
+
+    - name: Build unit tests (windows).
+      if: (matrix.platform == 'windows-latest')
+      run: |
+        pushd build
+        msbuild roughtime_cpp_test.sln        
+        popd
 
     - name: Run unit tests.
       if: (github.workflow != 'CD')
