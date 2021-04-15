@@ -9,7 +9,7 @@ on:
     branches:
       - master
       - devel
-      - feat/chfo/210409_ga
+
     tags:
       - '*' # Test all pushed tags
 
