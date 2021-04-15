@@ -54,7 +54,6 @@ jobs:
       uses: microsoft/setup-msbuild@v1.0.2
 
     - name: Run cmake
-      if: (matrix.platform == 'ubuntu-latest') || (matrix.platform == 'macos-latest') || (matrix.platform == 'windows-latest')
       run: |
         mkdir build
         pushd build
@@ -79,6 +78,6 @@ jobs:
       if: (github.workflow != 'CD')
       run: |
         pushd build
-        ctest -j4 --verbose
+        ctest --verbose
         popd        
   
