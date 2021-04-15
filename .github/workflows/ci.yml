@@ -49,14 +49,20 @@ jobs:
         git submodule sync
         git submodule update --init --recursive 
 
-    - name: Build unit tests.
+    - name: Run cmake
       if: (matrix.platform == 'ubuntu-latest') || (matrix.platform == 'macos-latest') || (matrix.platform == 'windows-latest')
       run: |
         mkdir build
         pushd build
         cmake ..
-        make -j4
         popd
+
+    - name: Build unit tests.
+      if: (matrix.platform == 'ubuntu-latest') || (matrix.platform == 'macos-latest')
+      run: |
+        pushd build
+        make -j4
+        popd        
 
     - name: Run unit tests.
       if: (github.workflow != 'CD')
