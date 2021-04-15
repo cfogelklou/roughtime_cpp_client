@@ -64,6 +64,10 @@ jobs:
         make -j4
         popd
 
+    - name: Add msbuild to PATH on windows
+      if: (matrix.platform == 'windows-latest')
+      uses: microsoft/setup-msbuild@v1.0.2
+
     - name: Build unit tests (windows).
       if: (matrix.platform == 'windows-latest')
       run: |
