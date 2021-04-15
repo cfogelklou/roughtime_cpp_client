@@ -50,7 +50,7 @@ jobs:
         git submodule update --init --recursive 
 
     - name: Build unit tests.
-      if: (matrix.platform == 'ubuntu-latest') || (matrix.platform == 'macos-latest')
+      if: (matrix.platform == 'ubuntu-latest') || (matrix.platform == 'macos-latest') || (matrix.platform == 'windows-latest')
       run: |
         mkdir build
         pushd build
