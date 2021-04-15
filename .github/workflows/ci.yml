@@ -7,8 +7,9 @@ on:
   push:
     # Sequence of patterns matched against refs/heads
     branches:
-      - master # Push events on master + devel branch    
-      - devel # Push events on master + devel branch            
+      - master
+      - devel
+      - feat/chfo/210409_ga
     tags:
       - '*' # Test all pushed tags
 
@@ -36,7 +37,7 @@ jobs:
     name: Build and run unit tests
     strategy:
       matrix:
-        platform: [ubuntu-latest] # , macos-latest
+        platform: [ubuntu-latest, macos-latest, windows-latest] # , macos-latest
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 15
     steps:
