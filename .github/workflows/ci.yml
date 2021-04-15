@@ -42,18 +42,16 @@ jobs:
     timeout-minutes: 15
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v1
+      uses: actions/checkout@v2
 
     - name: Checkout submodules
       run: |
-        echo Checkout submodules
-        #git fetch origin
         git submodule sync
         git submodule update --init --recursive 
 
     - name: Build unit tests.
+      if: (matrix.platform == 'ubuntu-latest') || (matrix.platform == 'macos-latest')
       run: |
-        rm -rf build
         mkdir build
         pushd build
         cmake ..
