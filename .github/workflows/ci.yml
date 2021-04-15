@@ -49,6 +49,10 @@ jobs:
         git submodule sync
         git submodule update --init --recursive 
 
+    - name: Add msbuild to PATH (windows).
+      if: (matrix.platform == 'windows-latest')
+      uses: microsoft/setup-msbuild@v1.0.2
+
     - name: Run cmake
       if: (matrix.platform == 'ubuntu-latest') || (matrix.platform == 'macos-latest') || (matrix.platform == 'windows-latest')
       run: |
@@ -63,10 +67,6 @@ jobs:
         pushd build
         make -j4
         popd
-
-    - name: Add msbuild to PATH on windows
-      if: (matrix.platform == 'windows-latest')
-      uses: microsoft/setup-msbuild@v1.0.2
 
     - name: Build unit tests (windows).
       if: (matrix.platform == 'windows-latest')
