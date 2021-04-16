@@ -7,8 +7,9 @@ on:
   push:
     # Sequence of patterns matched against refs/heads
     branches:
-      - master # Push events on master + devel branch    
-      - devel # Push events on master + devel branch            
+      - master
+      - devel
+
     tags:
       - '*' # Test all pushed tags
 
@@ -36,33 +37,47 @@ jobs:
     name: Build and run unit tests
     strategy:
       matrix:
-        platform: [ubuntu-latest] # , macos-latest
+        platform: [ubuntu-latest, macos-latest, windows-latest] # , macos-latest
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 15
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v1
+      uses: actions/checkout@v2
 
     - name: Checkout submodules
       run: |
-        echo Checkout submodules
-        #git fetch origin
         git submodule sync
         git submodule update --init --recursive 
 
-    - name: Build unit tests.
+    - name: Add msbuild to PATH (windows).
+      if: (matrix.platform == 'windows-latest')
+      uses: microsoft/setup-msbuild@v1.0.2
+
+    - name: Run cmake
       run: |
-        rm -rf build
         mkdir build
         pushd build
         cmake ..
+        popd
+
+    - name: Build unit tests (ubuntu or macos).
+      if: (matrix.platform == 'ubuntu-latest') || (matrix.platform == 'macos-latest')
+      run: |
+        pushd build
         make -j4
+        popd
+
+    - name: Build unit tests (windows).
+      if: (matrix.platform == 'windows-latest')
+      run: |
+        pushd build
+        msbuild roughtime_cpp_test.sln        
         popd
 
     - name: Run unit tests.
       if: (github.workflow != 'CD')
       run: |
         pushd build
-        ctest -j4 --verbose
+        ctest --verbose
         popd        
-  
+
