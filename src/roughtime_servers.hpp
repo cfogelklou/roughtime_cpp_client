@@ -2,7 +2,11 @@
 #define ROUGHTIME_PAK_SERVERS_HPP
 
 /**
+<<<<<<< HEAD
 * COPYRIGHT	(c)	Applicaudia 2019
+=======
+* COPYRIGHT	(c)	Polestar 2019
+>>>>>>> bb
 * @file     roughtime_servers.hpp
 * @brief    Indexable list of roughtime servers trusted by the firmware.
 */
