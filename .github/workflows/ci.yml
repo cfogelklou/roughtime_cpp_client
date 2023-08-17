@@ -26,7 +26,10 @@ on:
   pull_request_review:
     types:
       - submitted
-  status: {}
+  
+  # Manual trigger.
+  workflow_dispatch:
+
 env:
   RELEASE: release
   
